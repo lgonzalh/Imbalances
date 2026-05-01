@@ -12,7 +12,7 @@
         <!-- Panel Izquierdo: Explorador -->
         <div class="panel left-panel">
             <div class="panel-header">
-                <MudText Typo="Typo.subtitle1" Class="header-text">Explorador de archivos</MudText>
+                <MudText Typo="Typo.h6">Explorador de archivos</MudText>
             </div>
             <div class="panel-content scrollable">
                 <InputFile id="folderInput" multiple OnChange="OnInputFileChanged" style="display: none;" accept=".xlsx,.xls" webkitdirectory directory />
@@ -51,7 +51,7 @@
         <!-- Panel Derecho: Archivos Seleccionados -->
         <div class="panel right-panel">
             <div class="panel-header d-flex justify-space-between align-center">
-                <MudText Typo="Typo.subtitle1" Class="header-text">Archivos seleccionados</MudText>
+                <MudText Typo="Typo.h6">Archivos seleccionados</MudText>
                 <div class="counter-badge">@GetSelectedFiles().Count archivos</div>
             </div>
             <div class="panel-content scrollable pa-2">
@@ -81,11 +81,11 @@
 
     @if (resultados.Any())
     {
-        <div class="results-container mt-4">
-            <MudCard Elevation="0" Class="results-card">
+        <MudItem xs="12">
+            <MudCard Elevation="3">
                 <MudCardHeader>
                     <CardHeaderContent>
-                        <MudText Typo="Typo.h6" Class="results-header">Resultados de la extracción</MudText>
+                        <MudText Typo="Typo.h6">Resultados de la extracción</MudText>
                     </CardHeaderContent>
                 </MudCardHeader>
                 <MudCardContent>
@@ -101,11 +101,13 @@
                     </MudDataGrid>
                 </MudCardContent>
             </MudCard>
-        </div>
+        </MudItem>
     }
 </div>
 
 <style>
+    body { font-family: 'Tahoma', sans-serif; }
+
     .explorer-container {
         padding: 0;
         height: calc(100vh - 120px);
@@ -126,7 +128,6 @@
     .panel {
         display: flex;
         flex-direction: column;
-        background-color: #1a1a1a;
     }
 
     .left-panel {
@@ -140,13 +141,11 @@
 
     .panel-header {
         padding: 12px 16px;
-        background-color: #242424;
         border-bottom: 1px solid #333;
     }
 
     .header-text {
         font-weight: 500;
-        color: #e0e0e0;
     }
 
     .counter-badge {

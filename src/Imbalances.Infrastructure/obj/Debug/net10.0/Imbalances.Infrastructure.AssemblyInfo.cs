@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Imbalances.Infrastructure")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+150f6d9f79dfc39d5427e57dfa6c9b144c5348cd")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+57a1c1808978334b3034ea60216d47285e963387")]
 [assembly: System.Reflection.AssemblyProductAttribute("Imbalances.Infrastructure")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Imbalances.Infrastructure")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

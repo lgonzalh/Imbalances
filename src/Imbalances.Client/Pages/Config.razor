@@ -1,59 +1,138 @@
 @page "/config"
 @inject IConfigService ConfigService
-@using System.Text.Json
 @using Imbalances.Core.Models
 
 <PageTitle>Imbalances - Configuración</PageTitle>
 
-<MudGrid>
-    <MudItem xs="12">
-        <MudCard>
-            <MudCardHeader>
-                <CardHeaderContent>
-                    <MudText Typo="Typo.h6">Configuración JSON</MudText>
-                </CardHeaderContent>
-            </MudCardHeader>
-            <MudCardContent>
-                <MudTextField T="string" @bind-Value="jsonConfig" Lines="25" Variant="Variant.Outlined" Style="font-family: monospace;" />
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="GuardarConfiguracion" Class="mt-4" StartIcon="@Icons.Material.Filled.Save">
-                    Guardar
-                </MudButton>
-                @if (mensaje != null)
-                {
-                    <MudText Typo="Typo.body2" Color="@mensajeColor" Class="mt-2">@mensaje</MudText>
-                }
-            </MudCardContent>
-        </MudCard>
-    </MudItem>
-</MudGrid>
+<MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-6">
+    <MudTabPage Text="Empresas">
+        <MudDataGrid Items="@_config.Empresas" ReadOnly="false" EditMode="DataGridEditMode.Cell" CommittedItemChanges="@Save">
+            <Columns>
+                <PropertyColumn Property="x => x.Nombre" Title="Nombre" />
+                <PropertyColumn Property="x => x.CarpetaRegex" Title="Regex Carpeta" />
+                <PropertyColumn Property="x => x.ArchivoRegex" Title="Regex Archivo" />
+                <PropertyColumn Property="x => x.HojaBalance" Title="Nombre Hoja Balance" />
+                <TemplateColumn>
+                    <CellTemplate>
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" OnClick="@(() => RemoveEmpresa(context.Item))" />
+                    </CellTemplate>
+                </TemplateColumn>
+            </Columns>
+        </MudDataGrid>
+        <MudButton StartIcon="@Icons.Material.Filled.Add" OnClick="AddEmpresa" Class="mt-4" Color="Color.Primary">Agregar Empresa</MudButton>
+    </MudTabPage>
+
+    <MudTabPage Text="Notas">
+        <MudDataGrid Items="@_config.Notas" ReadOnly="false" EditMode="DataGridEditMode.Cell" CommittedItemChanges="@Save">
+            <Columns>
+                <PropertyColumn Property="x => x.Nota" Title="Número Nota" />
+                <PropertyColumn Property="x => x.NombreHoja" Title="Nombre Hoja Excel" />
+                <TemplateColumn>
+                    <CellTemplate>
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" OnClick="@(() => RemoveNota(context.Item))" />
+                    </CellTemplate>
+                </TemplateColumn>
+            </Columns>
+        </MudDataGrid>
+        <MudButton StartIcon="@Icons.Material.Filled.Add" OnClick="AddNota" Class="mt-4" Color="Color.Primary">Agregar Nota</MudButton>
+    </MudTabPage>
+
+    <MudTabPage Text="Equivalencias">
+        <MudDataGrid Items="@_config.Equivalencias" ReadOnly="false" EditMode="DataGridEditMode.Cell" CommittedItemChanges="@Save">
+            <Columns>
+                <PropertyColumn Property="x => x.CuentaCanonica" Title="Cuenta" />
+                <PropertyColumn Property="x => x.Categoria" Title="Categoría (CxC/CxP)" />
+                <PropertyColumn Property="x => x.Tipo" Title="Tipo (Activo/Pasivo)" />
+                <TemplateColumn Title="Alias (separar por ;)">
+                    <CellTemplate>
+                        @string.Join("; ", context.Item.AliasTexto)
+                    </CellTemplate>
+                    <EditTemplate>
+                        <MudTextField T="string" Value="@string.Join("; ", context.Item.AliasTexto)" 
+                                      ValueChanged="@((s) => UpdateAliases(context.Item, s))" Label="Alias" />
+                    </EditTemplate>
+                </TemplateColumn>
+                <TemplateColumn Title="Notas Permitidas (separar por ;)">
+                    <CellTemplate>
+                        @string.Join("; ", context.Item.NotasPermitidas)
+                    </CellTemplate>
+                    <EditTemplate>
+                        <MudTextField T="string" Value="@string.Join("; ", context.Item.NotasPermitidas)" 
+                                      ValueChanged="@((s) => UpdateNotasPermitidas(context.Item, s))" Label="Notas" />
+                    </EditTemplate>
+                </TemplateColumn>
+                <PropertyColumn Property="x => x.ColumnaValor" Title="Columna Valor (Ej: H)" />
+                <TemplateColumn>
+                    <CellTemplate>
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" OnClick="@(() => RemoveEquivalencia(context.Item))" />
+                    </CellTemplate>
+                </TemplateColumn>
+            </Columns>
+        </MudDataGrid>
+        <MudButton StartIcon="@Icons.Material.Filled.Add" OnClick="AddEquivalencia" Class="mt-4" Color="Color.Primary">Agregar Equivalencia</MudButton>
+    </MudTabPage>
+</MudTabs>
+
+<MudPaper Class="pa-4 mt-4 d-flex justify-end" Elevation="0">
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Save" StartIcon="@Icons.Material.Filled.Save">Guardar Configuración</MudButton>
+</MudPaper>
 
 @code {
-    private string jsonConfig = string.Empty;
-    private string? mensaje;
-    private Color mensajeColor;
+    private ConfiguracionCore _config = new();
 
     protected override async Task OnInitializedAsync()
     {
-        var config = await ConfigService.CargarConfiguracionAsync();
-        jsonConfig = JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true });
+        _config = await ConfigService.CargarConfiguracionAsync();
     }
 
-    private async Task GuardarConfiguracion()
+    private async Task Save()
     {
-        try
-        {
-            var config = JsonSerializer.Deserialize<ConfiguracionCore>(jsonConfig);
-            if (config != null)
-            {
-                await ConfigService.GuardarConfiguracionAsync(config);
-                mensaje = "Configuración guardada exitosamente.";
-                mensajeColor = Color.Success;
-            }
-        }
-        catch (Exception ex)
-        {
-            mensaje = $"Error de formato JSON: {ex.Message}";
-            mensajeColor = Color.Error;
-        }
+        await ConfigService.GuardarConfiguracionAsync(_config);
+    }
+
+    private void AddEmpresa()
+    {
+        _config.Empresas.Add(new EmpresaConfig());
+        StateHasChanged();
+    }
+    
+    private void RemoveEmpresa(EmpresaConfig item)
+    {
+        _config.Empresas.Remove(item);
+        StateHasChanged();
+    }
+
+    private void AddNota()
+    {
+        _config.Notas.Add(new NotaConfig());
+        StateHasChanged();
+    }
+
+    private void RemoveNota(NotaConfig item)
+    {
+        _config.Notas.Remove(item);
+        StateHasChanged();
+    }
+
+    private void AddEquivalencia()
+    {
+        _config.Equivalencias.Add(new CuentaEquivalencia());
+        StateHasChanged();
+    }
+
+    private void RemoveEquivalencia(CuentaEquivalencia item)
+    {
+        _config.Equivalencias.Remove(item);
+        StateHasChanged();
+    }
+
+    private void UpdateAliases(CuentaEquivalencia item, string value)
+    {
+        item.AliasTexto = value.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+    }
+
+    private void UpdateNotasPermitidas(CuentaEquivalencia item, string value)
+    {
+        item.NotasPermitidas = value.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
     }
 }

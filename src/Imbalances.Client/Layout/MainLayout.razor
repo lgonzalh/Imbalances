@@ -7,7 +7,7 @@
 <MudLayout>
     <MudAppBar Elevation="1">
         <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@((e) => DrawerToggle())" />
-        <MudText Typo="Typo.h5" Class="ml-3" Style="font-weight: bold; letter-spacing: 2px;">SOLID RIVER CAPITAL - Imbalances</MudText>
+        <MudText Typo="Typo.h5" Class="ml-3" Style="font-weight: bold; letter-spacing: 2px;">Imbalances</MudText>
     </MudAppBar>
     <MudDrawer @bind-Open="_drawerOpen" Elevation="2">
         <MudNavMenu>
@@ -28,26 +28,28 @@
 
     private MudTheme _currentTheme = new MudTheme()
     {
-        PaletteDark = new PaletteDark()
+        Typography = new Typography()
         {
-            Primary = "#E0006C", // Magenta BI icon as primary accent
+            Default = new Default()
+            {
+                FontFamily = new[] { "Tahoma", "sans-serif" }
+            }
+        },
+        PaletteLight = new PaletteLight()
+        {
+            Primary = "#E0006C",
             Secondary = "#E0006C",
-            AppbarBackground = "#000000", // Black top bar
+            Background = "#FFFFFF",
+            Surface = "#FFFFFF",
+            AppbarBackground = "#E0006C",
             AppbarText = "#FFFFFF",
-            Background = "#1a1a1a", // Very dark gray background
-            Surface = "#2c2c2c", // Slightly lighter gray for cards/panels
-            DrawerBackground = "#1a1a1a",
-            DrawerText = "#FFFFFF",
-            TextPrimary = "#FFFFFF",
-            TextSecondary = "#aaaaaa",
-            ActionDefault = "#FFFFFF"
+            DrawerBackground = "#FFFFFF",
+            DrawerText = "#000000",
+            TextPrimary = "#000000",
+            TextSecondary = "#555555",
+            ActionDefault = "#000000"
         }
     };
-
-    protected override void OnInitialized()
-    {
-        _currentTheme.PaletteLight = _currentTheme.PaletteDark; // Force dark theme
-    }
 
     void DrawerToggle()
     {
