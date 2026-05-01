@@ -5,19 +5,24 @@
 <MudSnackbarProvider />
 
 <MudLayout>
-    <MudAppBar Elevation="1">
+    <MudAppBar Elevation="0" Class="mud-elevation-0" Style="background-color: #002C54; color: #FFFFFF; border-bottom: 2px solid #555960;">
         <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@((e) => DrawerToggle())" />
-        <MudText Typo="Typo.h5" Class="ml-3" Style="font-weight: bold; letter-spacing: 2px;">Imbalances</MudText>
+        <MudText Typo="Typo.h5" Class="ml-3" Style="font-family: 'Montserrat', sans-serif; font-weight: 700; letter-spacing: 1.5px;">IMBALANCES</MudText>
+        <MudSpacer />
+        <MudText Typo="Typo.caption" Class="mr-4">SOLID RIVER CAPITAL</MudText>
     </MudAppBar>
-    <MudDrawer @bind-Open="_drawerOpen" Elevation="2">
+    <MudDrawer @bind-Open="_drawerOpen" Elevation="1" Anchor="Anchor.Left" Variant="@DrawerVariant.Responsive" Style="background-color: #FFFFFF; border-right: 1px solid #DAE0E6;">
+        <MudDrawerHeader Class="pa-4">
+            <MudText Typo="Typo.h6" Style="color: #002C54; font-weight: 700;">Menú Principal</MudText>
+        </MudDrawerHeader>
         <MudNavMenu>
-            <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.FolderOpen">Explorador</MudNavLink>
-            <MudNavLink Href="/config" Icon="@Icons.Material.Filled.Settings">Configuración</MudNavLink>
-            <MudNavLink Href="/resultados" Icon="@Icons.Material.Filled.TableChart">Resultados</MudNavLink>
+            <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Outlined.Folder" Style="color: #002C54;">Explorador</MudNavLink>
+            <MudNavLink Href="/config" Icon="@Icons.Material.Outlined.Settings" Style="color: #002C54;">Configuración</MudNavLink>
+            <MudNavLink Href="/resultados" Icon="@Icons.Material.Outlined.Analytics" Style="color: #002C54;">Análisis</MudNavLink>
         </MudNavMenu>
     </MudDrawer>
-    <MudMainContent>
-        <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="my-4">
+    <MudMainContent Style="background-color: #FFFFFF;">
+        <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="my-6">
             @Body
         </MudContainer>
     </MudMainContent>
@@ -30,24 +35,38 @@
     {
         Typography = new Typography()
         {
-            Default = new Default()
+            Default = new DefaultTypography()
             {
-                FontFamily = new[] { "Tahoma", "sans-serif" }
-            }
+                FontFamily = new[] { "Roboto", "Helvetica", "Arial", "sans-serif" },
+                FontSize = "0.875rem",
+                FontWeight = 400,
+                LineHeight = 1.43,
+                LetterSpacing = ".01071em"
+            },
+            H1 = new H1() { FontFamily = new[] { "Montserrat", "sans-serif" }, FontWeight = 700 },
+            H2 = new H2() { FontFamily = new[] { "Montserrat", "sans-serif" }, FontWeight = 700 },
+            H3 = new H3() { FontFamily = new[] { "Montserrat", "sans-serif" }, FontWeight = 700 },
+            H4 = new H4() { FontFamily = new[] { "Montserrat", "sans-serif" }, FontWeight = 700 },
+            H5 = new H5() { FontFamily = new[] { "Montserrat", "sans-serif" }, FontWeight = 700 },
+            H6 = new H6() { FontFamily = new[] { "Montserrat", "sans-serif" }, FontWeight = 700 },
+            Button = new Button() { FontFamily = new[] { "Montserrat", "sans-serif" }, FontWeight = 600, TextTransform = "none" }
         },
         PaletteLight = new PaletteLight()
         {
-            Primary = "#E0006C",
-            Secondary = "#E0006C",
+            Primary = "#002C54",
+            Secondary = "#555960",
             Background = "#FFFFFF",
             Surface = "#FFFFFF",
-            AppbarBackground = "#E0006C",
+            AppbarBackground = "#002C54",
             AppbarText = "#FFFFFF",
             DrawerBackground = "#FFFFFF",
-            DrawerText = "#000000",
-            TextPrimary = "#000000",
-            TextSecondary = "#555555",
-            ActionDefault = "#000000"
+            DrawerText = "#002C54",
+            DrawerIcon = "#002C54",
+            TextPrimary = "#002C54",
+            TextSecondary = "#555960",
+            ActionDefault = "#002C54",
+            TableStriped = "#F8F9FA",
+            TableHover = "#EEF2F6"
         }
     };
 

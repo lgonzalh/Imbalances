@@ -4,9 +4,9 @@
 
 <PageTitle>Imbalances - Configuración</PageTitle>
 
-<MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-6">
-    <MudTabPage Text="Empresas">
-        <MudDataGrid Items="@_config.Empresas" ReadOnly="false" EditMode="DataGridEditMode.Cell" CommittedItemChanges="@Save">
+<MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true">
+    <MudTabPanel Text="Empresas">
+        <MudDataGrid T="EmpresaConfig" Items="@_config.Empresas" ReadOnly="false" EditMode="DataGridEditMode.Cell">
             <Columns>
                 <PropertyColumn Property="x => x.Nombre" Title="Nombre" />
                 <PropertyColumn Property="x => x.CarpetaRegex" Title="Regex Carpeta" />
@@ -20,10 +20,10 @@
             </Columns>
         </MudDataGrid>
         <MudButton StartIcon="@Icons.Material.Filled.Add" OnClick="AddEmpresa" Class="mt-4" Color="Color.Primary">Agregar Empresa</MudButton>
-    </MudTabPage>
+    </MudTabPanel>
 
-    <MudTabPage Text="Notas">
-        <MudDataGrid Items="@_config.Notas" ReadOnly="false" EditMode="DataGridEditMode.Cell" CommittedItemChanges="@Save">
+    <MudTabPanel Text="Notas">
+        <MudDataGrid T="NotaConfig" Items="@_config.Notas" ReadOnly="false" EditMode="DataGridEditMode.Cell">
             <Columns>
                 <PropertyColumn Property="x => x.Nota" Title="Número Nota" />
                 <PropertyColumn Property="x => x.NombreHoja" Title="Nombre Hoja Excel" />
@@ -35,10 +35,10 @@
             </Columns>
         </MudDataGrid>
         <MudButton StartIcon="@Icons.Material.Filled.Add" OnClick="AddNota" Class="mt-4" Color="Color.Primary">Agregar Nota</MudButton>
-    </MudTabPage>
+    </MudTabPanel>
 
-    <MudTabPage Text="Equivalencias">
-        <MudDataGrid Items="@_config.Equivalencias" ReadOnly="false" EditMode="DataGridEditMode.Cell" CommittedItemChanges="@Save">
+    <MudTabPanel Text="Equivalencias">
+        <MudDataGrid T="CuentaEquivalencia" Items="@_config.Equivalencias" ReadOnly="false" EditMode="DataGridEditMode.Cell">
             <Columns>
                 <PropertyColumn Property="x => x.CuentaCanonica" Title="Cuenta" />
                 <PropertyColumn Property="x => x.Categoria" Title="Categoría (CxC/CxP)" />
@@ -70,7 +70,7 @@
             </Columns>
         </MudDataGrid>
         <MudButton StartIcon="@Icons.Material.Filled.Add" OnClick="AddEquivalencia" Class="mt-4" Color="Color.Primary">Agregar Equivalencia</MudButton>
-    </MudTabPage>
+    </MudTabPanel>
 </MudTabs>
 
 <MudPaper Class="pa-4 mt-4 d-flex justify-end" Elevation="0">
@@ -128,11 +128,11 @@
 
     private void UpdateAliases(CuentaEquivalencia item, string value)
     {
-        item.AliasTexto = value.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+        item.AliasTexto = (value ?? "").Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
     }
 
     private void UpdateNotasPermitidas(CuentaEquivalencia item, string value)
     {
-        item.NotasPermitidas = value.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+        item.NotasPermitidas = (value ?? "").Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
     }
 }

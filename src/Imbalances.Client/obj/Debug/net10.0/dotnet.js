@@ -5,7 +5,7 @@ var e=!1;const t=async()=>WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,
   "mainAssemblyName": "Imbalances.Client",
   "applicationEnvironment": "Development",
   "resources": {
-    "hash": "sha256-JbJi4xu2/ip6hQSL5zL2BHCZiEgB3ufGga7++G3hCDk=",
+    "hash": "sha256-bfdNOXq83k5vlDI7w41x84QlOySOWkwI4fm/86nrTnU=",
     "jsModuleNative": [
       {
         "name": "dotnet.native.3qf6w265iu.js"
@@ -1272,40 +1272,40 @@ var e=!1;const t=async()=>WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,
       },
       {
         "virtualPath": "Imbalances.Core.wasm",
-        "name": "Imbalances.Core.9erqasf20x.wasm",
-        "integrity": "sha256-MbePvyb7On8BZaKuZiRBCOXbitwONAUJw35oVFuCjac=",
+        "name": "Imbalances.Core.8k7uxfhphn.wasm",
+        "integrity": "sha256-ONH7vc5+IP3bBFLgTEy3suaMWDMU/TvDZ4EfdUPItTU=",
         "cache": "force-cache"
       },
       {
         "virtualPath": "Imbalances.Infrastructure.wasm",
-        "name": "Imbalances.Infrastructure.4nktv1sp8y.wasm",
-        "integrity": "sha256-QM9Ljov4lUiqh3VkQ4Kb9Q309+E8ol9Fo6mPEnHzPIk=",
+        "name": "Imbalances.Infrastructure.lz1dah1g5e.wasm",
+        "integrity": "sha256-UYk+MnCTMbccQyWJyUefKolotFHDy6S5S7RY269tcTU=",
         "cache": "force-cache"
       },
       {
         "virtualPath": "Imbalances.Client.wasm",
-        "name": "Imbalances.Client.jprjkb19n3.wasm",
-        "integrity": "sha256-+fzZZupflY33ZBPn3gK/SZT2UcEEjzVfMBfBin5kDZo=",
+        "name": "Imbalances.Client.wx0gi91wo3.wasm",
+        "integrity": "sha256-PHFcCYXgLkXGv/H+Scg85eDT4NCSWzPJBuIUp4eZiv0=",
         "cache": "force-cache"
       }
     ],
     "pdb": [
       {
         "virtualPath": "Imbalances.Core.pdb",
-        "name": "Imbalances.Core.rge6lp3zh3.pdb",
-        "integrity": "sha256-RUi6bp858wDIFShDuIaizjQpP35ejgv4OP+Mr7OcSBA=",
+        "name": "Imbalances.Core.70m10qj1ty.pdb",
+        "integrity": "sha256-WcKoBUJK6LT/K/JINpg+SrGbgL/KK3uitMLau4Inmzw=",
         "cache": "force-cache"
       },
       {
         "virtualPath": "Imbalances.Infrastructure.pdb",
-        "name": "Imbalances.Infrastructure.06s0b8hrag.pdb",
-        "integrity": "sha256-mGl6KwM4FI8W9niN+2XMxByI+nmK2pTy71VNYIO0Sss=",
+        "name": "Imbalances.Infrastructure.th2bku2p3l.pdb",
+        "integrity": "sha256-YQ2hvGm97XAuKBEe3INAQDdHGTUOpAwOcl0EBO33PEU=",
         "cache": "force-cache"
       },
       {
         "virtualPath": "Imbalances.Client.pdb",
-        "name": "Imbalances.Client.kgwm26pb08.pdb",
-        "integrity": "sha256-1LeIi7lNLvQ9XhExboE58273UzdGqhEAo521cr4n7fY=",
+        "name": "Imbalances.Client.j8tjx42oe5.pdb",
+        "integrity": "sha256-PXTDHeeyppLJWKNTsXSwllnsSgq0SZ+8hJxAzMvbPpo=",
         "cache": "force-cache"
       }
     ],
