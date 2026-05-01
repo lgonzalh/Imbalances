@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Imbalances.Core")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+951ee738ea688ac8b0809b054f54a55d75b88070")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+150f6d9f79dfc39d5427e57dfa6c9b144c5348cd")]
 [assembly: System.Reflection.AssemblyProductAttribute("Imbalances.Core")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Imbalances.Core")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

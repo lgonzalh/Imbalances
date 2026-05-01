@@ -5,7 +5,7 @@ var e=!1;const t=async()=>WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,
   "mainAssemblyName": "Imbalances.Client",
   "applicationEnvironment": "Development",
   "resources": {
-    "hash": "sha256-ASt/T9MboVLJ8R9D8Ko2uw1OicnC2rGtEWyU6BDr63k=",
+    "hash": "sha256-JbJi4xu2/ip6hQSL5zL2BHCZiEgB3ufGga7++G3hCDk=",
     "jsModuleNative": [
       {
         "name": "dotnet.native.3qf6w265iu.js"
@@ -58,6 +58,18 @@ var e=!1;const t=async()=>WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,
       }
     ],
     "assembly": [
+      {
+        "virtualPath": "ExcelDataReader.wasm",
+        "name": "ExcelDataReader.z30rusxxp0.wasm",
+        "integrity": "sha256-sahRQmOAEc6/e+0eOpsKux7TlR3TTORdUCKG9kJNvEE=",
+        "cache": "force-cache"
+      },
+      {
+        "virtualPath": "ExcelDataReader.DataSet.wasm",
+        "name": "ExcelDataReader.DataSet.qxrai7h0vv.wasm",
+        "integrity": "sha256-7onK2tZpKF9b5/e6c+3oTfn6hVvfp6OGGptvmLtkFg0=",
+        "cache": "force-cache"
+      },
       {
         "virtualPath": "Microsoft.AspNetCore.Authorization.wasm",
         "name": "Microsoft.AspNetCore.Authorization.oul7oynlco.wasm",
@@ -1260,40 +1272,40 @@ var e=!1;const t=async()=>WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,
       },
       {
         "virtualPath": "Imbalances.Core.wasm",
-        "name": "Imbalances.Core.e3e48fdh4v.wasm",
-        "integrity": "sha256-piv6OF0ymXSkIfSzCu/VXLJjXEdC+6H6lf3NnXH2V6o=",
+        "name": "Imbalances.Core.9erqasf20x.wasm",
+        "integrity": "sha256-MbePvyb7On8BZaKuZiRBCOXbitwONAUJw35oVFuCjac=",
         "cache": "force-cache"
       },
       {
         "virtualPath": "Imbalances.Infrastructure.wasm",
-        "name": "Imbalances.Infrastructure.qtmijqufq2.wasm",
-        "integrity": "sha256-Dn/kyH9mgXNeBrTJYdQ46Yn7vzoyUP3jy67FLEMzklc=",
+        "name": "Imbalances.Infrastructure.4nktv1sp8y.wasm",
+        "integrity": "sha256-QM9Ljov4lUiqh3VkQ4Kb9Q309+E8ol9Fo6mPEnHzPIk=",
         "cache": "force-cache"
       },
       {
         "virtualPath": "Imbalances.Client.wasm",
-        "name": "Imbalances.Client.ylkllo152s.wasm",
-        "integrity": "sha256-lkAhY+SJNCEY6y2s3C/OizqTGvLVEfGJEusbx91JcbA=",
+        "name": "Imbalances.Client.jprjkb19n3.wasm",
+        "integrity": "sha256-+fzZZupflY33ZBPn3gK/SZT2UcEEjzVfMBfBin5kDZo=",
         "cache": "force-cache"
       }
     ],
     "pdb": [
       {
         "virtualPath": "Imbalances.Core.pdb",
-        "name": "Imbalances.Core.hpj6rr8ajg.pdb",
-        "integrity": "sha256-RfDRLSYk4NYWfGWCUs6V6ldyNGgilZXcEbYGT4Ii3dU=",
+        "name": "Imbalances.Core.rge6lp3zh3.pdb",
+        "integrity": "sha256-RUi6bp858wDIFShDuIaizjQpP35ejgv4OP+Mr7OcSBA=",
         "cache": "force-cache"
       },
       {
         "virtualPath": "Imbalances.Infrastructure.pdb",
-        "name": "Imbalances.Infrastructure.28nzvc3p2o.pdb",
-        "integrity": "sha256-rgDJ6oHf6Bv5aNNCSJncWjNFzBedDlYvYPhS3m+dGgE=",
+        "name": "Imbalances.Infrastructure.06s0b8hrag.pdb",
+        "integrity": "sha256-mGl6KwM4FI8W9niN+2XMxByI+nmK2pTy71VNYIO0Sss=",
         "cache": "force-cache"
       },
       {
         "virtualPath": "Imbalances.Client.pdb",
-        "name": "Imbalances.Client.sp2enmelu3.pdb",
-        "integrity": "sha256-wEvmUIg4WjOeMidETXPRvSKS3w26Yg1+I2zr+w035ew=",
+        "name": "Imbalances.Client.kgwm26pb08.pdb",
+        "integrity": "sha256-1LeIi7lNLvQ9XhExboE58273UzdGqhEAo521cr4n7fY=",
         "cache": "force-cache"
       }
     ],
