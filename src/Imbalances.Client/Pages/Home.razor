@@ -1,0 +1,339 @@
+@page "/"
+@inject IProgressService ProgressService
+@inject IConfigService ConfigService
+@inject IExtractorEngine ExtractorEngine
+@inject IJSRuntime JS
+@implements IDisposable
+
+<PageTitle>Imbalances - Explorador</PageTitle>
+
+<MudGrid>
+    <!-- Controles invisibles y botones -->
+    <MudItem xs="12" Class="d-flex align-center">
+        <InputFile id="folderInput" multiple OnChange="OnInputFileChanged" style="display: none;" accept=".xlsx,.xls" webkitdirectory directory />
+        <MudButton HtmlTag="label" for="folderInput" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.FolderOpen">
+            Cargar Carpeta
+        </MudButton>
+        <InputFile id="filesInput" multiple OnChange="OnInputFileChanged" style="display: none;" accept=".xlsx,.xls" />
+        <MudButton HtmlTag="label" for="filesInput" Variant="Variant.Filled" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.FileUpload" Class="ml-2">
+            Cargar Archivos
+        </MudButton>
+    </MudItem>
+
+    <MudItem xs="4">
+        <!-- Panel Izquierdo: Explorador -->
+        <MudCard Elevation="3" Style="height: 600px; overflow-y: auto; background-color: #2c2c2c; color: white;">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6" Style="color: white;">Explorador de archivos</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                @if (TreeItems.Any())
+                {
+                    <MudTreeView T="TreeItemData" Items="TreeItems" Hover="true">
+                        <ItemTemplate Context="item">
+                            <MudTreeViewItem T="TreeItemData" @bind-Expanded="@item.IsExpanded" Items="@item.Children" Text="@item.Name" Icon="@item.Icon">
+                                <Content>
+                                    <MudCheckBox @bind-Value="item.IsSelected" Color="Color.Primary" Size="Size.Small" Class="mr-2" />
+                                    <MudIcon Icon="@item.Icon" Class="mr-2" />
+                                    <MudText>@item.Name</MudText>
+                                </Content>
+                            </MudTreeViewItem>
+                        </ItemTemplate>
+                    </MudTreeView>
+                }
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    <MudItem xs="8">
+        <!-- Panel Derecho: Archivos Seleccionados -->
+        <MudCard Elevation="3" Style="height: 600px; display: flex; flex-direction: column; background-color: #2c2c2c; color: white;">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <div class="d-flex justify-space-between align-center">
+                        <MudText Typo="Typo.h6" Style="color: white;">Archivos seleccionados</MudText>
+                        <MudChip T="string" Color="Color.Info" Size="Size.Small">@GetSelectedFiles().Count archivos</MudChip>
+                    </div>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent Style="flex-grow: 1; overflow-y: auto;">
+                @foreach (var file in GetSelectedFiles())
+                {
+                    <MudPaper Class="pa-3 mb-2 d-flex justify-space-between align-center" Style="background-color: #3d3d3d; color: white;">
+                        <div class="d-flex align-center">
+                            <MudIcon Icon="@Icons.Custom.FileFormats.FileExcel" Color="Color.Success" Class="mr-3" />
+                            <div>
+                                <MudText Typo="Typo.subtitle2" Style="font-weight: bold;">@file.Name</MudText>
+                                <MudText Typo="Typo.caption" Style="color: #aaaaaa;">@file.Path</MudText>
+                            </div>
+                        </div>
+                        <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" Color="Color.Inherit" OnClick="@(() => RemoveFile(file))" />
+                    </MudPaper>
+                }
+            </MudCardContent>
+            <MudCardActions Class="d-flex justify-end pa-4">
+                <MudButton Variant="Variant.Outlined" Color="Color.Inherit" Class="mr-2" OnClick="Cancelar">Cancelar</MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ProcesarSeleccion" Disabled="@(!GetSelectedFiles().Any())">Confirmar selección</MudButton>
+            </MudCardActions>
+        </MudCard>
+    </MudItem>
+
+    @if (resultados.Any())
+    {
+        <MudItem xs="12">
+            <MudCard Elevation="3" Style="background-color: #2c2c2c; color: white;">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6" Style="color: white;">Resultados de la extracción</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudDataGrid Items="@resultados" Dense="true" Hover="true" Striped="true" QuickFilter="@((x) => true)">
+                        <Columns>
+                            <PropertyColumn Property="x => x.Empresa" Title="Empresa" />
+                            <PropertyColumn Property="x => x.Cuenta" Title="Cuenta" />
+                            <PropertyColumn Property="x => x.Categoria" Title="Categoría" />
+                            <PropertyColumn Property="x => x.Tipo" Title="Tipo" />
+                            <PropertyColumn Property="x => x.Nota" Title="Nota" />
+                            <PropertyColumn Property="x => x.Valor" Title="Valor" Format="N2" />
+                        </Columns>
+                    </MudDataGrid>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    }
+</MudGrid>
+
+@code {
+    private List<IBrowserFile> _browserFiles = new();
+    private List<TreeItemData> TreeItems { get; set; } = new();
+    private TreeItemData? SelectedValue { get; set; }
+
+    public class TreeItemData : ITreeItemData<TreeItemData>
+    {
+        public string Name { get; set; } = string.Empty;
+        public string Path { get; set; } = string.Empty;
+        public bool IsFolder { get; set; }
+        public IBrowserFile? BrowserFile { get; set; }
+        public bool IsSelected { get; set; }
+        public bool IsExpanded { get; set; } = true;
+        public List<TreeItemData> Children { get; set; } = new();
+
+        // ITreeItemData members
+        public string? Text { get => Name; set => Name = value ?? ""; }
+        public string? Icon { get => IsFolder ? Icons.Material.Filled.Folder : Icons.Custom.FileFormats.FileExcel; set { } }
+        public string? IconColor { get; set; }
+        public string? SelectedIcon { get; set; }
+        public bool Expanded { get => IsExpanded; set => IsExpanded = value; }
+        public bool Selected { get => IsSelected; set => IsSelected = value; }
+        public bool Disabled { get; set; }
+        public bool? Loading { get; set; }
+        public bool Visible { get; set; } = true;
+        public bool Expandable { get => true; set { } }
+        public bool HasChildren => Children.Any();
+        IReadOnlyCollection<ITreeItemData<TreeItemData>>? ITreeItemData<TreeItemData>.Children { get => Children; set { } }
+        public IReadOnlyCollection<TreeItemData>? Items => Children;
+        public TreeItemData? Value { get => this; set { } }
+    }
+
+    private DotNetObjectReference<Home>? _objRef;
+
+    protected override void OnInitialized()
+    {
+        _objRef = DotNetObjectReference.Create(this);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JS.InvokeVoidAsync("fileExplorer.getFiles", "folderInput", _objRef);
+            await JS.InvokeVoidAsync("fileExplorer.getFiles", "filesInput", _objRef);
+        }
+    }
+
+    public void Dispose()
+    {
+        _objRef?.Dispose();
+    }
+
+    private void OnInputFileChanged(InputFileChangeEventArgs e)
+    {
+        _browserFiles = e.GetMultipleFiles(maximumFileCount: 5000)
+                         .Where(f => f.Name.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase) || f.Name.EndsWith(".xls", StringComparison.OrdinalIgnoreCase))
+                         .ToList();
+    }
+
+    [JSInvokable]
+    public void OnFilesSelectedJS(List<FileJSData> files)
+    {
+        TreeItems = BuildTree(files);
+        StateHasChanged();
+    }
+
+    public class FileJSData
+    {
+        public string name { get; set; } = string.Empty;
+        public string path { get; set; } = string.Empty;
+        public long size { get; set; }
+    }
+
+    private List<TreeItemData> BuildTree(List<FileJSData> jsFiles)
+    {
+        var rootItems = new List<TreeItemData>();
+        
+        foreach (var jsFile in jsFiles)
+        {
+            var parts = jsFile.path.Split('/');
+            var currentLevel = rootItems;
+            string currentPath = "";
+
+            for (int i = 0; i < parts.Length; i++)
+            {
+                var part = parts[i];
+                currentPath += (i == 0 ? "" : "/") + part;
+                var isFile = i == parts.Length - 1;
+
+                var existingNode = currentLevel.FirstOrDefault(n => n.Name == part);
+                
+                if (existingNode == null)
+                {
+                    existingNode = new TreeItemData
+                    {
+                        Name = part,
+                        Path = currentPath,
+                        IsFolder = !isFile,
+                        IsSelected = true // Selected by default
+                    };
+
+                    if (isFile)
+                    {
+                        // Match with IBrowserFile
+                        existingNode.BrowserFile = _browserFiles.FirstOrDefault(b => b.Name == jsFile.name && b.Size == jsFile.size);
+                    }
+
+                    currentLevel.Add(existingNode);
+                }
+
+                if (!isFile)
+                {
+                    currentLevel = existingNode.Children.ToList(); // this is a conceptual flaw, we need to add to the HashSet
+                    
+                    // Actually, let's update currentLevel to refer to the Children of existingNode correctly
+                    // MudBlazor TreeView binds to HashSet
+                }
+            }
+        }
+        
+        // Correct implementation of tree building
+        return BuildTreeCorrectly(jsFiles);
+    }
+
+    private List<TreeItemData> BuildTreeCorrectly(List<FileJSData> jsFiles)
+    {
+        var root = new TreeItemData { IsFolder = true, Name = "root", Path = "" };
+
+        foreach (var jsFile in jsFiles)
+        {
+            var parts = jsFile.path.Split('/');
+            var current = root;
+            string currentPath = "";
+
+            for (int i = 0; i < parts.Length; i++)
+            {
+                var part = parts[i];
+                currentPath += (string.IsNullOrEmpty(currentPath) ? "" : "/") + part;
+                var isFile = i == parts.Length - 1;
+
+                var child = current.Children.FirstOrDefault(c => c.Name == part);
+                if (child == null)
+                {
+                    child = new TreeItemData
+                    {
+                        Name = part,
+                        Path = currentPath,
+                        IsFolder = !isFile,
+                        IsSelected = true
+                    };
+                    if (isFile)
+                    {
+                        child.BrowserFile = _browserFiles.FirstOrDefault(b => b.Name == jsFile.name && b.Size == jsFile.size);
+                    }
+                    current.Children.Add(child);
+                }
+                current = child;
+            }
+        }
+        return root.Children.ToList();
+    }
+
+    private List<TreeItemData> GetSelectedFiles()
+    {
+        var selected = new List<TreeItemData>();
+        void Traverse(IEnumerable<TreeItemData> items)
+        {
+            foreach (var item in items)
+            {
+                if (!item.IsFolder && item.IsSelected)
+                {
+                    selected.Add(item);
+                }
+                Traverse(item.Children);
+            }
+        }
+        Traverse(TreeItems);
+        return selected;
+    }
+
+    private void RemoveFile(TreeItemData file)
+    {
+        file.IsSelected = false;
+    }
+
+    private void Cancelar()
+    {
+        TreeItems.Clear();
+        _browserFiles.Clear();
+    }
+
+    private List<RegistroContable> resultados = new();
+
+    private async Task ProcesarSeleccion()
+    {
+        var filesToProcess = GetSelectedFiles().Where(f => f.BrowserFile != null).ToList();
+        if (!filesToProcess.Any()) return;
+
+        resultados.Clear();
+        ProgressService.Inicializar(filesToProcess.Count);
+        
+        var config = await ConfigService.CargarConfiguracionAsync();
+
+        foreach (var fileItem in filesToProcess)
+        {
+            var file = fileItem.BrowserFile!;
+            ProgressService.Log($"Procesando {file.Name}", "Info");
+            
+            try
+            {
+                using var stream = file.OpenReadStream(maxAllowedSize: 100 * 1024 * 1024);
+                using var memoryStream = new MemoryStream();
+                await stream.CopyToAsync(memoryStream);
+                memoryStream.Position = 0;
+
+                var res = await ExtractorEngine.ProcesarArchivoAsync(fileItem.Path, memoryStream, config);
+                resultados.AddRange(res);
+                
+                ProgressService.Avanzar($"Completado: {file.Name}");
+            }
+            catch (Exception ex)
+            {
+                ProgressService.Log($"Error en {file.Name}: {ex.Message}", "Error");
+            }
+        }
+
+        ProgressService.Log("Proceso finalizado.", "Success");
+        StateHasChanged();
+    }
+}

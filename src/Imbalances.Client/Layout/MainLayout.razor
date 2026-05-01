@@ -1,0 +1,56 @@
+@inherits LayoutComponentBase
+
+<MudThemeProvider Theme="_currentTheme" />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<MudLayout>
+    <MudAppBar Elevation="1">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@((e) => DrawerToggle())" />
+        <MudText Typo="Typo.h5" Class="ml-3" Style="font-weight: bold; letter-spacing: 2px;">SOLID RIVER CAPITAL - Imbalances</MudText>
+    </MudAppBar>
+    <MudDrawer @bind-Open="_drawerOpen" Elevation="2">
+        <MudNavMenu>
+            <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.FolderOpen">Explorador</MudNavLink>
+            <MudNavLink Href="/config" Icon="@Icons.Material.Filled.Settings">Configuración</MudNavLink>
+            <MudNavLink Href="/resultados" Icon="@Icons.Material.Filled.TableChart">Resultados</MudNavLink>
+        </MudNavMenu>
+    </MudDrawer>
+    <MudMainContent>
+        <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="my-4">
+            @Body
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
+
+@code {
+    bool _drawerOpen = true;
+
+    private MudTheme _currentTheme = new MudTheme()
+    {
+        PaletteDark = new PaletteDark()
+        {
+            Primary = "#E0006C", // Magenta BI icon as primary accent
+            Secondary = "#E0006C",
+            AppbarBackground = "#000000", // Black top bar
+            AppbarText = "#FFFFFF",
+            Background = "#1a1a1a", // Very dark gray background
+            Surface = "#2c2c2c", // Slightly lighter gray for cards/panels
+            DrawerBackground = "#1a1a1a",
+            DrawerText = "#FFFFFF",
+            TextPrimary = "#FFFFFF",
+            TextSecondary = "#aaaaaa",
+            ActionDefault = "#FFFFFF"
+        }
+    };
+
+    protected override void OnInitialized()
+    {
+        _currentTheme.PaletteLight = _currentTheme.PaletteDark; // Force dark theme
+    }
+
+    void DrawerToggle()
+    {
+        _drawerOpen = !_drawerOpen;
+    }
+}

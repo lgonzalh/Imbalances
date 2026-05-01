@@ -1,0 +1,12 @@
+C:\Users\lgonz\Documents\GitHub\Imbalances\src\Imbalances.Core\bin\Debug\net10.0\Imbalances.Core.deps.json
+C:\Users\lgonz\Documents\GitHub\Imbalances\src\Imbalances.Core\bin\Debug\net10.0\Imbalances.Core.dll
+C:\Users\lgonz\Documents\GitHub\Imbalances\src\Imbalances.Core\bin\Debug\net10.0\Imbalances.Core.pdb
+C:\Users\lgonz\Documents\GitHub\Imbalances\src\Imbalances.Core\obj\Debug\net10.0\Imbalances.Core.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\lgonz\Documents\GitHub\Imbalances\src\Imbalances.Core\obj\Debug\net10.0\Imbalances.Core.AssemblyInfoInputs.cache
+C:\Users\lgonz\Documents\GitHub\Imbalances\src\Imbalances.Core\obj\Debug\net10.0\Imbalances.Core.AssemblyInfo.cs
+C:\Users\lgonz\Documents\GitHub\Imbalances\src\Imbalances.Core\obj\Debug\net10.0\Imbalances.Core.csproj.CoreCompileInputs.cache
+C:\Users\lgonz\Documents\GitHub\Imbalances\src\Imbalances.Core\obj\Debug\net10.0\Imbalances.Core.sourcelink.json
+C:\Users\lgonz\Documents\GitHub\Imbalances\src\Imbalances.Core\obj\Debug\net10.0\Imbalances.Core.dll
+C:\Users\lgonz\Documents\GitHub\Imbalances\src\Imbalances.Core\obj\Debug\net10.0\refint\Imbalances.Core.dll
+C:\Users\lgonz\Documents\GitHub\Imbalances\src\Imbalances.Core\obj\Debug\net10.0\Imbalances.Core.pdb
+C:\Users\lgonz\Documents\GitHub\Imbalances\src\Imbalances.Core\obj\Debug\net10.0\ref\Imbalances.Core.dll

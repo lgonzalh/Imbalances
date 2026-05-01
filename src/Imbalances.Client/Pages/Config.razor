@@ -1,0 +1,59 @@
+@page "/config"
+@inject IConfigService ConfigService
+@using System.Text.Json
+@using Imbalances.Core.Models
+
+<PageTitle>Imbalances - Configuración</PageTitle>
+
+<MudGrid>
+    <MudItem xs="12">
+        <MudCard>
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">Configuración JSON</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudTextField T="string" @bind-Value="jsonConfig" Lines="25" Variant="Variant.Outlined" Style="font-family: monospace;" />
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="GuardarConfiguracion" Class="mt-4" StartIcon="@Icons.Material.Filled.Save">
+                    Guardar
+                </MudButton>
+                @if (mensaje != null)
+                {
+                    <MudText Typo="Typo.body2" Color="@mensajeColor" Class="mt-2">@mensaje</MudText>
+                }
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private string jsonConfig = string.Empty;
+    private string? mensaje;
+    private Color mensajeColor;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var config = await ConfigService.CargarConfiguracionAsync();
+        jsonConfig = JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true });
+    }
+
+    private async Task GuardarConfiguracion()
+    {
+        try
+        {
+            var config = JsonSerializer.Deserialize<ConfiguracionCore>(jsonConfig);
+            if (config != null)
+            {
+                await ConfigService.GuardarConfiguracionAsync(config);
+                mensaje = "Configuración guardada exitosamente.";
+                mensajeColor = Color.Success;
+            }
+        }
+        catch (Exception ex)
+        {
+            mensaje = $"Error de formato JSON: {ex.Message}";
+            mensajeColor = Color.Error;
+        }
+    }
+}
