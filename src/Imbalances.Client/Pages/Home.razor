@@ -46,11 +46,10 @@
                 }
                 else
                 {
-                    <MudTreeView T="TreeItemData" Items="@GetFilteredItems().Where(i => i.Visible)" Hover="true" Dense="true" Class="custom-tree" 
-                                 ExpandIcon="@Icons.Material.Filled.ChevronRight" 
+                    <MudTreeView T="TreeItemData" Items="@GetFilteredItems().Where(i => i.Visible).ToList()" Hover="true" Dense="true" Class="custom-tree" 
                                  ExpandOnDoubleClick="true">
                         <ItemTemplate Context="item">
-                            <MudTreeViewItem T="TreeItemData" @bind-Expanded="@item.Value.IsExpanded" Items="@item.Children.Where(c => c.Visible)" Class="tree-item">
+                            <MudTreeViewItem T="TreeItemData" @bind-Expanded="@item.Value.IsExpanded" Items="@item.Children.Where(c => c.Visible).ToList()" Class="tree-item">
                                 <Content>
                                     <div class="tree-item-content">
                                         @if (item.Value.IsFolder)
@@ -370,7 +369,7 @@
         public string? IconColor { get; set; }
         public string? SelectedIcon { get; set; }
         public bool Expanded { get => IsExpanded; set => IsExpanded = value; }
-        public bool Selected { get => IsSelected; set => IsSelected = value; }
+        public bool Selected { get => IsSelected == true; set => IsSelected = value; }
         public bool Disabled { get; set; }
         public bool? Loading { get; set; }
         public bool Visible { get; set; } = true;
@@ -482,19 +481,20 @@
         }
     }
 
-    private bool ApplyFilter(IEnumerable<TreeItemData> items, string filter)
+    private bool ApplyFilter(IEnumerable<TreeItemData> items, string filter, bool parentMatched = false)
     {
         bool anyVisible = false;
         foreach (var item in items)
         {
-            bool matches = item.Name.Contains(filter, StringComparison.OrdinalIgnoreCase);
-            bool childrenVisible = ApplyFilter(item.Children, filter);
+            bool matches = item.Name.Contains(filter, StringComparison.OrdinalIgnoreCase) || parentMatched;
+            bool childrenVisible = ApplyFilter(item.Children, filter, matches);
             
             item.Visible = matches || childrenVisible;
             if (item.Visible)
             {
                 anyVisible = true;
-                if (childrenVisible) item.IsExpanded = true;
+                if (childrenVisible && !string.IsNullOrEmpty(filter) && !parentMatched) 
+                    item.IsExpanded = true;
             }
         }
         return anyVisible;
