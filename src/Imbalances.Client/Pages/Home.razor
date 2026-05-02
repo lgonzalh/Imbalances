@@ -46,23 +46,24 @@
                 }
                 else
                 {
-                    <MudTreeView T="TreeItemData" Items="GetFilteredItems()" Hover="true" Dense="true" Class="custom-tree" ExpandIcon="@Icons.Material.Filled.KeyboardArrowRight">
+                    <MudTreeView T="TreeItemData" Items="@GetFilteredItems().Where(i => i.Visible)" Hover="true" Dense="true" Class="custom-tree" 
+                                 ExpandIcon="@Icons.Material.Filled.ChevronRight" 
+                                 ExpandOnDoubleClick="true">
                         <ItemTemplate Context="item">
-                            <MudTreeViewItem T="TreeItemData" @bind-Expanded="@item.Expanded" Items="@item.Children" Text="@item.Text" Class="tree-item">
+                            <MudTreeViewItem T="TreeItemData" @bind-Expanded="@item.Value.IsExpanded" Items="@item.Children.Where(c => c.Visible)" Class="tree-item">
                                 <Content>
                                     <div class="tree-item-content">
-                                        <div class="tree-item-main">
-                                            @if (item.Value.IsFolder)
-                                            {
-                                                <MudIcon Icon="@(item.Expanded ? Icons.Material.Filled.FolderOpen : Icons.Material.Filled.Folder)" Size="Size.Small" Color="Color.Default" Class="mr-2" />
-                                            }
-                                            else
-                                            {
-                                                <MudIcon Icon="@Icons.Custom.FileFormats.FileExcel" Size="Size.Small" Color="Color.Success" Class="mr-2" />
-                                            }
-                                            <MudCheckBox @bind-Value="item.Value.IsSelected" Color="Color.Primary" Dense="true" T="bool" Class="tree-checkbox" />
-                                            <MudText Typo="Typo.body2" Class="tree-text">@item.Text</MudText>
-                                        </div>
+                                        @if (item.Value.IsFolder)
+                                        {
+                                            <MudIcon Icon="@Icons.Material.Outlined.Folder" Size="Size.Small" Color="Color.Default" Class="mr-2" />
+                                        }
+                                        else
+                                        {
+                                            <MudIcon Icon="@Icons.Custom.FileFormats.FileExcel" Size="Size.Small" Color="Color.Success" Class="mr-2" />
+                                        }
+                                        <MudCheckBox T="bool?" Value="item.Value.IsSelected" ValueChanged="@((v) => item.Value.IsSelected = v)" 
+                                                     Color="Color.Primary" Dense="true" Class="tree-checkbox" TriState="false" />
+                                        <MudText Typo="Typo.body2" Class="tree-text">@item.Text</MudText>
                                     </div>
                                 </Content>
                             </MudTreeViewItem>
@@ -333,13 +334,25 @@
         public string Path { get; set; } = string.Empty;
         public bool IsFolder { get; set; }
         public IBrowserFile? BrowserFile { get; set; }
-        private bool _isSelected;
-        public bool IsSelected 
+        
+        private bool? _isSelected = false;
+        public bool? IsSelected 
         { 
-            get => _isSelected; 
+            get 
+            {
+                if (!IsFolder) return _isSelected;
+                if (!Children.Any()) return _isSelected;
+                
+                bool allSelected = Children.All(c => c.IsSelected == true);
+                bool noneSelected = Children.All(c => c.IsSelected == false);
+                
+                if (allSelected) return true;
+                if (noneSelected) return false;
+                return null; // Indeterminate
+            }
             set 
             {
-                _isSelected = value;
+                _isSelected = value ?? false;
                 if (IsFolder)
                 {
                     foreach (var child in Children)
@@ -450,39 +463,41 @@
 
     private List<TreeItemData> GetFilteredItems()
     {
-        if (string.IsNullOrWhiteSpace(_searchString)) return TreeItems;
-        return FilterRecursive(TreeItems);
+        if (string.IsNullOrWhiteSpace(_searchString))
+        {
+            SetAllVisible(TreeItems, true);
+            return TreeItems;
+        }
+        
+        ApplyFilter(TreeItems, _searchString);
+        return TreeItems;
     }
 
-    private List<TreeItemData> FilterRecursive(IEnumerable<TreeItemData> items)
+    private void SetAllVisible(IEnumerable<TreeItemData> items, bool visible)
     {
-        var filtered = new List<TreeItemData>();
         foreach (var item in items)
         {
-            if (item.Name.Contains(_searchString, StringComparison.OrdinalIgnoreCase))
+            item.Visible = visible;
+            SetAllVisible(item.Children, visible);
+        }
+    }
+
+    private bool ApplyFilter(IEnumerable<TreeItemData> items, string filter)
+    {
+        bool anyVisible = false;
+        foreach (var item in items)
+        {
+            bool matches = item.Name.Contains(filter, StringComparison.OrdinalIgnoreCase);
+            bool childrenVisible = ApplyFilter(item.Children, filter);
+            
+            item.Visible = matches || childrenVisible;
+            if (item.Visible)
             {
-                filtered.Add(item);
-            }
-            else if (item.IsFolder)
-            {
-                var filteredChildren = FilterRecursive(item.Children);
-                if (filteredChildren.Any())
-                {
-                    var clone = new TreeItemData
-                    {
-                        Name = item.Name,
-                        Path = item.Path,
-                        IsFolder = item.IsFolder,
-                        BrowserFile = item.BrowserFile,
-                        IsSelected = item.IsSelected,
-                        IsExpanded = true, // Auto expand if children match
-                        Children = filteredChildren
-                    };
-                    filtered.Add(clone);
-                }
+                anyVisible = true;
+                if (childrenVisible) item.IsExpanded = true;
             }
         }
-        return filtered;
+        return anyVisible;
     }
 
     private List<TreeItemData> GetSelectedFiles()
@@ -492,7 +507,7 @@
         {
             foreach (var item in items)
             {
-                if (!item.IsFolder && item.IsSelected)
+                if (!item.IsFolder && item.IsSelected == true)
                 {
                     selected.Add(item);
                 }
