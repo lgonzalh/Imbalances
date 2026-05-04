@@ -1,0 +1,319 @@
+@page "/analisis"
+@using Imbalances.Client.Services
+@using Imbalances.Core.Models
+@inject ExplorerStateService ExplorerState
+@inject IStatePersistenceService StatePersistence
+@inject IConfigService ConfigService
+@inject IAuditoriaService AuditoriaService
+@inject IJSRuntime JSRuntime
+@inject UiFeedbackService Ui
+
+<PageTitle>Analisis - Imbalances</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-6" Style="color: #002C54; font-weight: 700;">ANALISIS DE IMBALANCES</MudText>
+
+@if (!string.IsNullOrWhiteSpace(_initError))
+{
+    <MudAlert Severity="Severity.Error" Variant="Variant.Filled" Class="mb-6">
+        @_initError
+    </MudAlert>
+}
+
+@if (!TieneDatos)
+{
+    <MudAlert Severity="Severity.Info" Class="mt-4">No hay datos procesados. Inicie la extraccion en el Explorador primero.</MudAlert>
+}
+else
+{
+    @if (!_hayResultados && _empresasConfiguradas > 0)
+    {
+        <MudAlert Severity="Severity.Info" Class="mt-4 mb-4">Aún no hay extracción. Se muestra el análisis base con la configuración actual.</MudAlert>
+    }
+
+    <MudGrid Class="mb-6">
+        <MudItem xs="12" md="3">
+            <MudPaper Elevation="0" Class="pa-4 metric-card">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Registros</MudText>
+                <MudText Typo="Typo.h5" Style="font-weight: 700;">@ExplorerState.Resultados.Count</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="3">
+            <MudPaper Elevation="0" Class="pa-4 metric-card">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Hallazgos</MudText>
+                <MudText Typo="Typo.h5" Style="font-weight: 700; color: #B71C1C;">@ExplorerState.Hallazgos.Count</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="3">
+            <MudPaper Elevation="0" Class="pa-4 metric-card">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Reportes faltantes</MudText>
+                <MudText Typo="Typo.h5" Style="font-weight: 700;">@DocumentosFaltantes</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="3">
+            <MudPaper Elevation="0" Class="pa-4 metric-card">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Diferencia absoluta</MudText>
+                <MudText Typo="Typo.h5" Style="font-weight: 700;">@DiferenciaAbsoluta.ToString("N2")</MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    <MudPaper Elevation="0" Class="pa-4 mb-6 audit-panel">
+        <MudText Typo="Typo.h6" Class="mb-3" Style="color: #002C54; font-weight: 700;">DISPONIBILIDAD DOCUMENTAL</MudText>
+        <MudDataGrid Items="@ExplorerState.DocumentosVerificados" Dense="true" Hover="true" Striped="true" FixedHeader="true" Height="220px" Class="grid-lines" ColumnResizeMode="ResizeMode.Container" HorizontalScrollbar="true">
+            <Columns>
+                <PropertyColumn Property="x => x.Empresa" Title="Empresa" />
+                <PropertyColumn Property="x => x.Reporte" Title="Reporte" />
+                <TemplateColumn Title="Estado">
+                    <CellTemplate>
+                        <MudChip T="string" Color="@(context.Item.Presente ? Color.Success : Color.Error)" Variant="Variant.Outlined" Size="Size.Small">
+                            @(context.Item.Presente ? "Presente" : "Faltante")
+                        </MudChip>
+                    </CellTemplate>
+                </TemplateColumn>
+                <PropertyColumn Property="x => x.ArchivoEncontrado" Title="Archivo" />
+                <PropertyColumn Property="x => x.ArchivoRegex" Title="Patron" />
+            </Columns>
+        </MudDataGrid>
+    </MudPaper>
+
+    <MudPaper Elevation="0" Class="pa-4 mb-6 audit-panel">
+        <MudText Typo="Typo.h6" Class="mb-3" Style="color: #002C54; font-weight: 700;">AUDITORIA DE RECIPROCIDAD</MudText>
+        <MudDataGrid Items="@ExplorerState.Reciprocidades" Dense="true" Hover="true" Striped="true" FixedHeader="true" Height="260px" Class="grid-lines" ColumnResizeMode="ResizeMode.Container" HorizontalScrollbar="true">
+            <Columns>
+                <PropertyColumn Property="x => x.EmpresaCxc" Title="Entidad CxC" />
+                <PropertyColumn Property="x => x.EmpresaCxp" Title="Entidad CxP" />
+                <PropertyColumn Property="x => x.GrupoReciprocidad" Title="Grupo" />
+                <PropertyColumn Property="x => x.ValorCxc" Title="CxC" Format="N2" />
+                <PropertyColumn Property="x => x.ValorCxp" Title="CxP" Format="N2" />
+                <PropertyColumn Property="x => x.Diferencia" Title="Diferencia" Format="N2" />
+                <TemplateColumn Title="Control">
+                    <CellTemplate>
+                        <MudChip T="string" Color="@(context.Item.DentroTolerancia ? Color.Success : Color.Warning)" Variant="Variant.Outlined" Size="Size.Small">
+                            @(context.Item.DentroTolerancia ? "OK" : "Revisar")
+                        </MudChip>
+                    </CellTemplate>
+                </TemplateColumn>
+            </Columns>
+        </MudDataGrid>
+    </MudPaper>
+
+    <MudPaper Elevation="0" Class="pa-4 audit-panel">
+        <div class="d-flex justify-space-between align-center mb-3">
+            <MudText Typo="Typo.h6" Style="color: #002C54; font-weight: 700;">PANEL DE DISCONFORMIDADES</MudText>
+            <div class="app-button-bar">
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="ReconstruirAuditoriaAsync">Recalcular</MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="PersistirHallazgosEnOrigen" Disabled="@(!ExplorerState.Hallazgos.Any())">Persistir en Excel</MudButton>
+            </div>
+        </div>
+
+        <MudDataGrid Items="@ExplorerState.Hallazgos" Dense="true" Hover="true" Striped="true" FixedHeader="true" Height="420px" Class="grid-lines" ColumnResizeMode="ResizeMode.Container" HorizontalScrollbar="true">
+            <Columns>
+                <PropertyColumn Property="x => x.Tipo" Title="Tipo" />
+                <PropertyColumn Property="x => x.Severidad" Title="Severidad" />
+                <PropertyColumn Property="x => x.Empresa" Title="Empresa" />
+                <PropertyColumn Property="x => x.Contraparte" Title="Contraparte" />
+                <PropertyColumn Property="x => x.Cuenta" Title="Cuenta/Grupo" />
+                <PropertyColumn Property="x => x.Reporte" Title="Reporte" />
+                <PropertyColumn Property="x => x.Diferencia" Title="Diferencia" Format="N2" />
+                <TemplateColumn Title="Estado">
+                    <CellTemplate>
+                        <MudSelect T="string" Value="@context.Item.Estado" ValueChanged="@((value) => CambiarEstadoHallazgo(context.Item, value))" Margin="Margin.Dense" Variant="Variant.Outlined" Dense="true">
+                            <MudSelectItem Value="@("Pendiente")">Pendiente</MudSelectItem>
+                            <MudSelectItem Value="@("Revisado")">Revisado</MudSelectItem>
+                            <MudSelectItem Value="@("Corregido")">Corregido</MudSelectItem>
+                            <MudSelectItem Value="@("Descartado")">Descartado</MudSelectItem>
+                        </MudSelect>
+                    </CellTemplate>
+                </TemplateColumn>
+                <PropertyColumn Property="x => x.Detalle" Title="Detalle" />
+            </Columns>
+        </MudDataGrid>
+    </MudPaper>
+}
+
+<style>
+    .metric-card,
+    .audit-panel {
+        border: 1px solid var(--surface-border);
+        border-radius: 8px;
+        background-color: #FFFFFF;
+    }
+</style>
+
+@code {
+    private bool TieneDatos =>
+        ExplorerState.Resultados.Any() ||
+        ExplorerState.Hallazgos.Any() ||
+        ExplorerState.DocumentosVerificados.Any() ||
+        ExplorerState.Reciprocidades.Any();
+
+    private int DocumentosFaltantes => ExplorerState.DocumentosVerificados.Count(d => !d.Presente);
+    private decimal DiferenciaAbsoluta => ExplorerState.Reciprocidades.Sum(r => Math.Abs(r.Diferencia));
+    private string? _initError;
+    private bool _hayResultados;
+    private int _empresasConfiguradas;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var config = await ConfigService.CargarConfiguracionAsync();
+            _empresasConfiguradas = config.Empresas.Count(e => !string.IsNullOrWhiteSpace(e.NombreEmpresa) && !string.IsNullOrWhiteSpace(e.NombreCarpeta));
+
+            if (!TieneDatos)
+            {
+                var savedState = await StatePersistence.CargarEstadoAsync();
+                if (savedState != null)
+                {
+                    AplicarEstadoPersistido(savedState);
+                }
+            }
+
+            _hayResultados = ExplorerState.Resultados.Any();
+
+            if (!TieneDatos && _empresasConfiguradas > 0)
+            {
+                var auditoriaBase = AuditoriaService.Auditar(Array.Empty<RegistroContable>(), ExplorerState.ArchivosSeleccionados, config);
+                ExplorerState.Hallazgos = auditoriaBase.Hallazgos;
+                ExplorerState.DocumentosVerificados = auditoriaBase.Documentos;
+                ExplorerState.Reciprocidades = auditoriaBase.Reciprocidades;
+            }
+
+            if (ExplorerState.Resultados.Any() && !ExplorerState.Hallazgos.Any())
+            {
+                await ReconstruirAuditoriaAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            _initError = $"No fue posible cargar el módulo de Análisis: {ex.Message}";
+        }
+    }
+
+    private async Task ReconstruirAuditoriaAsync()
+    {
+        var config = await ConfigService.CargarConfiguracionAsync();
+        var auditoria = AuditoriaService.Auditar(ExplorerState.Resultados, ExplorerState.ArchivosSeleccionados, config);
+
+        foreach (var hallazgo in auditoria.Hallazgos)
+        {
+            if (ExplorerState.EstadosHallazgos.TryGetValue(hallazgo.Id, out var estado))
+            {
+                hallazgo.Estado = estado;
+            }
+            else
+            {
+                ExplorerState.EstadosHallazgos[hallazgo.Id] = hallazgo.Estado;
+            }
+        }
+
+        ExplorerState.Hallazgos = auditoria.Hallazgos;
+        ExplorerState.DocumentosVerificados = auditoria.Documentos;
+        ExplorerState.Reciprocidades = auditoria.Reciprocidades;
+        await GuardarEstadoAsync();
+        Ui.ShowSuccess("Auditoría recalculada.");
+    }
+
+    private async Task CambiarEstadoHallazgo(HallazgoVerificacion hallazgo, string estado)
+    {
+        hallazgo.Estado = estado;
+        hallazgo.FechaActualizacionUtc = DateTime.UtcNow;
+        ExplorerState.EstadosHallazgos[hallazgo.Id] = estado;
+        await GuardarEstadoAsync();
+    }
+
+    private async Task PersistirHallazgosEnOrigen()
+    {
+        try
+        {
+            var archivos = ObtenerArchivosConReferencia().ToList();
+            if (!archivos.Any())
+            {
+                Ui.ShowWarning("Vuelva a cargar la carpeta o archivos para escribir las plantillas Excel.");
+                return;
+            }
+
+            var exportados = 0;
+            foreach (var item in archivos)
+            {
+                var hallazgos = ExplorerState.Hallazgos
+                    .Where(h => string.IsNullOrWhiteSpace(h.ArchivoOrigen) || h.ArchivoOrigen.Equals(item.Path, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+
+                if (!hallazgos.Any())
+                {
+                    continue;
+                }
+
+                await using var stream = item.BrowserFile!.OpenReadStream(maxAllowedSize: 100 * 1024 * 1024);
+                using var streamRef = new DotNetStreamReference(stream);
+                await JSRuntime.InvokeVoidAsync("excelInterop.persistirHallazgos", streamRef, item.Name, hallazgos);
+                exportados++;
+            }
+
+            if (exportados > 0)
+            {
+                Ui.ShowSuccess($"Se generaron {exportados} plantilla(s) con hallazgos.");
+            }
+            else
+            {
+                Ui.ShowInfo("No hubo hallazgos asociados a archivos disponibles.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Ui.ShowError(ex, "Error al persistir en Excel.");
+        }
+    }
+
+    private IEnumerable<Home.TreeItemData> ObtenerArchivosConReferencia()
+    {
+        foreach (var item in Recorrer(ExplorerState.TreeItems))
+        {
+            if (!item.IsFolder && item.BrowserFile != null)
+            {
+                yield return item;
+            }
+        }
+    }
+
+    private static IEnumerable<Home.TreeItemData> Recorrer(IEnumerable<Home.TreeItemData> items)
+    {
+        foreach (var item in items)
+        {
+            yield return item;
+
+            foreach (var child in Recorrer(item.Children))
+            {
+                yield return child;
+            }
+        }
+    }
+
+    private void AplicarEstadoPersistido(PersistenceState savedState)
+    {
+        ExplorerState.Resultados = savedState.Resultados;
+        ExplorerState.Hallazgos = savedState.Hallazgos;
+        ExplorerState.DocumentosVerificados = savedState.DocumentosVerificados;
+        ExplorerState.Reciprocidades = savedState.Reciprocidades;
+        ExplorerState.EstadosHallazgos = savedState.EstadosHallazgos;
+        ExplorerState.ArchivosProcesados = savedState.ArchivosProcesados;
+        ExplorerState.ArchivosSeleccionados = savedState.ArchivosSeleccionados;
+        ExplorerState.HaySesionPendiente = !savedState.SesionFinalizada && savedState.ArchivosProcesados.Any();
+    }
+
+    private async Task GuardarEstadoAsync()
+    {
+        await StatePersistence.GuardarEstadoAsync(new PersistenceState
+        {
+            Resultados = ExplorerState.Resultados,
+            Hallazgos = ExplorerState.Hallazgos,
+            DocumentosVerificados = ExplorerState.DocumentosVerificados,
+            Reciprocidades = ExplorerState.Reciprocidades,
+            EstadosHallazgos = ExplorerState.EstadosHallazgos,
+            ArchivosProcesados = ExplorerState.ArchivosProcesados,
+            ArchivosSeleccionados = ExplorerState.ArchivosSeleccionados,
+            SesionFinalizada = !ExplorerState.HaySesionPendiente
+        });
+    }
+}

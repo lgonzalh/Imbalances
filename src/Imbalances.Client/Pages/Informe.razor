@@ -1,0 +1,184 @@
+@page "/informe"
+@using Imbalances.Client.Services
+@using Imbalances.Core.Models
+@inject ExplorerStateService ExplorerState
+@inject IStatePersistenceService StatePersistence
+@inject IConfigService ConfigService
+
+<PageTitle>Informe - Imbalances</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-6" Style="color: #002C54; font-weight: 700;">INFORME DE IMBALANCES</MudText>
+
+@if (!ExplorerState.Resultados.Any())
+{
+    <MudAlert Severity="Severity.Info" Class="mt-4 mb-4">No hay datos procesados. Se muestran las empresas configuradas con totales en 0.</MudAlert>
+}
+
+<MudExpansionPanels Elevation="1" MultiExpansion="true" Class="mt-4">
+        @foreach (var item in Consolidado)
+        {
+            var diffColor = item.Diferencia == 0 ? "#555960" : "#E65100";
+            var fontWeightDiff = item.Diferencia == 0 ? "500" : "700";
+
+            <MudExpansionPanel @key="item.Empresa">
+                <TitleContent>
+                    <div class="d-flex justify-space-between align-center" style="width: 100%;">
+                        <MudText Typo="Typo.h6" Style="color: #002C54; font-weight: 700; width: 35%;">@item.Empresa</MudText>
+                        <MudText Typo="Typo.body1" Style="font-weight: 600; color: #1D6F42; width: 20%;">Activos: @item.TotalCxC.ToString("N2")</MudText>
+                        <MudText Typo="Typo.body1" Style="font-weight: 600; color: #B71C1C; width: 20%;">Pasivos: @item.TotalCxP.ToString("N2")</MudText>
+                        <MudText Typo="Typo.body1" Style="@($"font-weight: {fontWeightDiff}; color: {diffColor}; width: 20%;")">Dif: @item.Diferencia.ToString("N2")</MudText>
+                    </div>
+                </TitleContent>
+                <ChildContent>
+                    <MudGrid>
+                        <MudItem xs="12" md="6">
+                            <MudDataGrid Items="@item.DetallesCxC" Dense="true" Hover="true" Striped="true" Elevation="0" Style="border: 1px solid var(--surface-border);" Class="grid-lines" ColumnResizeMode="ResizeMode.Container" HorizontalScrollbar="true" FixedHeader="true" Height="360px">
+                                <ToolBarContent>
+                                    <MudText Typo="Typo.subtitle1" Style="color: #1D6F42; font-weight: 700;">Detalle de Activos (CxC)</MudText>
+                                </ToolBarContent>
+                                <NoRecordsContent>
+                                    <MudText Typo="Typo.body2" Class="pa-4" Style="color: #555960;">Sin registros para mostrar.</MudText>
+                                </NoRecordsContent>
+                                <Columns>
+                                    <PropertyColumn Property="x => x.Cuenta" Title="Rubro Activo" />
+                                    <PropertyColumn Property="x => x.Nota" Title="Nota" />
+                                    <PropertyColumn Property="x => x.Valor" Title="Valor" Format="N2">
+                                        <CellTemplate>
+                                            <MudText Style="font-weight: 500; text-align: right; width: 100%; color: #1D6F42;">@context.Item.Valor.ToString("N2")</MudText>
+                                        </CellTemplate>
+                                    </PropertyColumn>
+                                </Columns>
+                            </MudDataGrid>
+                            <div class="d-flex justify-end mt-2">
+                                <MudText Typo="Typo.subtitle1" Style="font-weight: 700; color: #1D6F42;">Subtotal CxC: @item.TotalCxC.ToString("N2")</MudText>
+                            </div>
+                        </MudItem>
+
+                        <MudItem xs="12" md="6">
+                            <MudDataGrid Items="@item.DetallesCxP" Dense="true" Hover="true" Striped="true" Elevation="0" Style="border: 1px solid var(--surface-border);" Class="grid-lines" ColumnResizeMode="ResizeMode.Container" HorizontalScrollbar="true" FixedHeader="true" Height="360px">
+                                <ToolBarContent>
+                                    <MudText Typo="Typo.subtitle1" Style="color: #B71C1C; font-weight: 700;">Detalle de Pasivos (CxP)</MudText>
+                                </ToolBarContent>
+                                <NoRecordsContent>
+                                    <MudText Typo="Typo.body2" Class="pa-4" Style="color: #555960;">Sin registros para mostrar.</MudText>
+                                </NoRecordsContent>
+                                <Columns>
+                                    <PropertyColumn Property="x => x.Cuenta" Title="Rubro Pasivo" />
+                                    <PropertyColumn Property="x => x.Nota" Title="Nota" />
+                                    <PropertyColumn Property="x => x.Valor" Title="Valor" Format="N2">
+                                        <CellTemplate>
+                                            <MudText Style="font-weight: 500; text-align: right; width: 100%; color: #B71C1C;">@context.Item.Valor.ToString("N2")</MudText>
+                                        </CellTemplate>
+                                    </PropertyColumn>
+                                </Columns>
+                            </MudDataGrid>
+                            <div class="d-flex justify-end mt-2">
+                                <MudText Typo="Typo.subtitle1" Style="font-weight: 700; color: #B71C1C;">Subtotal CxP: @item.TotalCxP.ToString("N2")</MudText>
+                            </div>
+                        </MudItem>
+                    </MudGrid>
+                </ChildContent>
+            </MudExpansionPanel>
+        }
+    </MudExpansionPanels>
+
+@code {
+    public class ConsolidadoItem
+    {
+        public string Empresa { get; set; } = string.Empty;
+        public decimal TotalCxC { get; set; }
+        public decimal TotalCxP { get; set; }
+        public decimal Diferencia { get; set; }
+        public List<RegistroContable> DetallesCxC { get; set; } = new();
+        public List<RegistroContable> DetallesCxP { get; set; } = new();
+    }
+
+    private List<ConsolidadoItem> Consolidado = new();
+    private int _lastResultadosCount = -1;
+    private ConfiguracionCore _config = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _config = await ConfigService.CargarConfiguracionAsync();
+
+        if (!ExplorerState.Resultados.Any())
+        {
+            var savedState = await StatePersistence.CargarEstadoAsync();
+            if (savedState != null && savedState.Resultados.Any())
+            {
+                ExplorerState.Resultados = savedState.Resultados;
+                ExplorerState.ArchivosProcesados = savedState.ArchivosProcesados;
+            }
+        }
+
+        GenerarConsolidado();
+
+        if (!ExplorerState.Resultados.Any())
+        {
+            var savedState = await StatePersistence.CargarEstadoAsync();
+            if (savedState != null && savedState.Resultados.Any())
+            {
+                ExplorerState.Resultados = savedState.Resultados;
+                ExplorerState.ArchivosProcesados = savedState.ArchivosProcesados;
+                GenerarConsolidado();
+            }
+        }
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (ExplorerState.Resultados.Count != _lastResultadosCount)
+        {
+            _lastResultadosCount = ExplorerState.Resultados.Count;
+            GenerarConsolidado();
+            _ = InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void GenerarConsolidado()
+    {
+        var resultados = ExplorerState.Resultados;
+
+        var empresasConfiguradas = _config.Empresas
+            .Where(e => !string.IsNullOrWhiteSpace(e.NombreCarpeta))
+            .Select(e => string.IsNullOrWhiteSpace(e.NombreEmpresa) ? e.NombreCarpeta.Trim() : e.NombreEmpresa.Trim())
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(x => x)
+            .ToList();
+
+        if (resultados == null || !resultados.Any())
+        {
+            Consolidado = empresasConfiguradas.Count > 0
+                ? empresasConfiguradas
+                    .Select(nombre => new ConsolidadoItem { Empresa = nombre, TotalCxC = 0, TotalCxP = 0, Diferencia = 0 })
+                    .ToList()
+                : new List<ConsolidadoItem> { new ConsolidadoItem { Empresa = "Sin configuración", TotalCxC = 0, TotalCxP = 0, Diferencia = 0 } };
+            return;
+        }
+
+        var agrupado = resultados
+            .GroupBy(r => string.IsNullOrWhiteSpace(r.Empresa) ? "Sin empresa" : r.Empresa)
+            .ToDictionary(g => g.Key, g => new ConsolidadoItem
+            {
+                Empresa = g.Key,
+                TotalCxC = g.Where(x => x.Categoria == "CxC").Sum(x => x.Valor),
+                TotalCxP = g.Where(x => x.Categoria == "CxP").Sum(x => x.Valor),
+                Diferencia = g.Where(x => x.Categoria == "CxC").Sum(x => x.Valor) - g.Where(x => x.Categoria == "CxP").Sum(x => x.Valor),
+                DetallesCxC = g.Where(x => x.Categoria == "CxC").OrderBy(x => x.Cuenta).ToList(),
+                DetallesCxP = g.Where(x => x.Categoria == "CxP").OrderBy(x => x.Cuenta).ToList()
+            }, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var empresa in empresasConfiguradas)
+        {
+            if (!agrupado.ContainsKey(empresa))
+            {
+                agrupado[empresa] = new ConsolidadoItem { Empresa = empresa, TotalCxC = 0, TotalCxP = 0, Diferencia = 0 };
+            }
+        }
+
+        Consolidado = agrupado.Values
+            .OrderBy(x => x.Empresa)
+            .ToList();
+    }
+}
