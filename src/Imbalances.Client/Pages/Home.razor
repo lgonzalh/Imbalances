@@ -3,7 +3,11 @@
 @inject IConfigService ConfigService
 @inject IExtractorEngine ExtractorEngine
 @inject IJSRuntime JS
+@inject Imbalances.Client.Services.ExplorerStateService ExplorerState
+@inject Imbalances.Client.Services.IStatePersistenceService StatePersistence
 @using System.Text
+@using Imbalances.Core.Models
+@using Imbalances.Client.Services
 @implements IDisposable
 
 <PageTitle>Imbalances - Explorador de Datos</PageTitle>
@@ -118,6 +122,12 @@
             </div>
             <div class="panel-footer">
                 <MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="Cancelar" Class="footer-btn">Limpiar Todo</MudButton>
+                @if (logsProcesamiento.Any())
+                {
+                    <MudButton Variant="Variant.Outlined" Color="Color.Info" OnClick="ExportarLog" StartIcon="@Icons.Material.Filled.Description" Class="footer-btn mx-2">
+                        Exportar Log
+                    </MudButton>
+                }
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ProcesarSeleccion" Disabled="@(!GetSelectedFiles().Any())" Class="footer-btn confirm-btn px-8">
                     Iniciar
                 </MudButton>
@@ -125,7 +135,26 @@
         </div>
     </div>
 
-    @if (resultados.Any() || logsProcesamiento.Any())
+    @if (procesando)
+{
+    <MudItem xs="12" Class="mt-4">
+        <MudCard Elevation="1" Style="border: 1px solid #DAE0E6;">
+            <MudCardHeader Style="background-color: #F8F9FA; border-bottom: 1px solid #DAE0E6;">
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6" Style="color: #002C54; font-weight: 700;">PROCESANDO ARCHIVOS</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent Class="pa-4">
+                <MudProgressLinear Color="Color.Primary" Size="Size.Large" Striped="true" Value="@GetProgressValue()" Min="0" Max="100" />
+                <MudText Typo="Typo.body2" Class="mt-2" Style="color: #002C54;">
+                    @GetProgressText()
+                </MudText>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+}
+
+    @if (ExplorerState.Resultados.Any() || logsProcesamiento.Any())
     {
         <MudItem xs="12" Class="mt-6">
             <MudCard Elevation="1" Style="border: 1px solid #DAE0E6;">
@@ -138,7 +167,7 @@
                     </CardHeaderActions>
                 </MudCardHeader>
                 <MudCardContent Class="pa-0">
-                    <MudDataGrid Items="@resultados" Dense="true" Hover="true" Striped="true" FixedHeader="true" Height="450px" Class="results-grid">
+                    <MudDataGrid Items="@ExplorerState.Resultados" Dense="true" Hover="true" Striped="true" FixedHeader="true" Height="450px" Class="results-grid">
                         <Columns>
                             <PropertyColumn Property="x => x.Empresa" Title="Empresa" />
                             <PropertyColumn Property="x => x.Cuenta" Title="Cuenta Contable" />
@@ -162,13 +191,10 @@
         <MudItem xs="12" Class="mt-6">
             <MudCard Elevation="1" Style="border: 1px solid #DAE0E6;">
                 <MudCardHeader Style="background-color: #F8F9FA; border-bottom: 1px solid #DAE0E6;">
-                    <CardHeaderContent>
-                        <MudText Typo="Typo.h6" Style="color: #002C54; font-weight: 700;">LOG DE PROCESAMIENTO</MudText>
-                    </CardHeaderContent>
-                    <CardHeaderActions>
-                        <MudButton Color="Color.Primary" Variant="Variant.Text" OnClick="ExportarLog">Exportar Log</MudButton>
-                    </CardHeaderActions>
-                </MudCardHeader>
+                     <CardHeaderContent>
+                         <MudText Typo="Typo.h6" Style="color: #002C54; font-weight: 700;">LOG DE PROCESAMIENTO</MudText>
+                     </CardHeaderContent>
+                 </MudCardHeader>
                 <MudCardContent Class="pa-0">
                     <div class="log-container">
                         @foreach (var log in logsProcesamiento)
@@ -663,19 +689,26 @@
     {
         TreeItems.Clear();
         _browserFiles.Clear();
-        resultados.Clear();
+        ExplorerState.Resultados.Clear();
     }
-
-    private List<RegistroContable> resultados = new();
 
     private async Task ProcesarSeleccion()
     {
-        var filesToProcess = GetSelectedFiles().Where(f => f.BrowserFile != null).ToList();
+        var selectedFiles = GetSelectedFiles();
+        var filesToProcess = selectedFiles.Where(f => f.BrowserFile != null).ToList();
         if (!filesToProcess.Any()) return;
 
-        resultados.Clear();
+        // Sincronizar con el estado global
+        ExplorerState.Resultados.Clear();
+        ExplorerState.Hallazgos.Clear();
+        ExplorerState.ArchivosSeleccionados = selectedFiles.Select(f => f.Path).ToList();
+        
         logsProcesamiento.Clear();
         procesando = true;
+        
+        // Forzar actualización inmediata de la UI para mostrar barra de progreso
+        await Task.Delay(1); 
+        StateHasChanged();
         
         // Suscribirse a los cambios del ProgressService
         ProgressService.OnChange += ActualizarLogs;
@@ -700,7 +733,9 @@
                     memoryStream.Position = 0;
 
                     var res = await ExtractorEngine.ProcesarArchivoAsync(fileItem.Path, memoryStream, config, (msg) => ProgressService.Log(msg, "Info"));
-                    resultados.AddRange(res);
+                    
+                    // Guardar en el estado global para que otras páginas lo vean
+                    ExplorerState.Resultados.AddRange(res);
                     
                     ProgressService.Log($"FIN: Extracción exitosa para {file.Name}", "Success");
                     ProgressService.Avanzar($"Completado: {file.Name}");
@@ -712,6 +747,14 @@
             }
 
             ProgressService.Log("FIN GLOBAL: Proceso finalizado correctamente.", "Success");
+            
+            // Persistir el estado para que se mantenga al navegar
+            await StatePersistence.GuardarEstadoAsync(new Imbalances.Client.Services.PersistenceState
+            {
+                Resultados = ExplorerState.Resultados,
+                ArchivosSeleccionados = ExplorerState.ArchivosSeleccionados,
+                ArchivosProcesados = ExplorerState.ArchivosProcesados
+            });
         }
         catch (Exception globalEx)
         {
@@ -719,7 +762,6 @@
         }
         finally
         {
-            // Desuscribirse de los cambios
             ProgressService.OnChange -= ActualizarLogs;
             procesando = false;
             await InvokeAsync(StateHasChanged);
@@ -751,7 +793,6 @@
 
         var estado = ProgressService.ObtenerEstado();
         var fechaGeneracion = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-        var archivoActual = logsProcesamiento.LastOrDefault(l => l.Mensaje.Contains("Completado:"))?.Mensaje ?? "N/A";
         
         var contenido = new StringBuilder();
         contenido.AppendLine("IMBALANCES - LOG DE PROCESAMIENTO");
@@ -759,15 +800,28 @@
         contenido.AppendLine($"Etapa actual: {estado.EtapaActual}");
         contenido.AppendLine($"Archivo de Excel: {estado.CurrentStep}/{estado.TotalSteps}");
         contenido.AppendLine(new string('-', 80));
-        contenido.AppendLine();
 
         foreach (var log in logsProcesamiento)
         {
             contenido.AppendLine($"[{log.Timestamp:yyyy-MM-dd HH:mm:ss}] [{log.Estado}] {log.Mensaje}");
         }
 
-        var bytes = System.Text.Encoding.UTF8.GetBytes(contenido.ToString());
+        var bytes = Encoding.UTF8.GetBytes(contenido.ToString());
         var base64 = Convert.ToBase64String(bytes);
         await JS.InvokeVoidAsync("eval", $"const a = document.createElement('a'); a.href = 'data:text/plain;base64,{base64}'; a.download = 'imbalances_log_{DateTime.Now:yyyyMMdd_HHmmss}.txt'; a.click();");
+    }
+
+    private double GetProgressValue()
+    {
+        var estado = ProgressService.ObtenerEstado();
+        if (estado.TotalSteps == 0) return 0;
+        return (double)estado.CurrentStep / estado.TotalSteps * 100;
+    }
+
+    private string GetProgressText()
+    {
+        var estado = ProgressService.ObtenerEstado();
+        if (estado.TotalSteps == 0) return "Inicializando...";
+        return $"Archivo {estado.CurrentStep} de {estado.TotalSteps} - {estado.EtapaActual}";
     }
 }
