@@ -1,5 +1,12 @@
 # Imbalances - Registro de Versiones
 
+## v1.1.10 (2026-05-04)
+
+### ✅ Cambios Realizados:
+
+1. **Actualización de Versión**:
+   - Actualizado número de versión de v1.1.9 a v1.1.10 en `MainLayout.razor` y archivos `.csproj`.
+
 ## v1.1.9 (2026-05-03)
 
 ### ✅ Cambios Realizados:
