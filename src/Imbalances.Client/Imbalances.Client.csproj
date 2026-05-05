@@ -5,9 +5,13 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <OverrideHtmlAssetPlaceholders>true</OverrideHtmlAssetPlaceholders>
-    <Version>1.1.10</Version>
-    <AssemblyVersion>1.1.10.0</AssemblyVersion>
-    <FileVersion>1.1.10.0</FileVersion>
+    <Version>1.1.16</Version>
+    <AssemblyVersion>1.1.16.0</AssemblyVersion>
+    <FileVersion>1.1.16.0</FileVersion>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+    <CompressionEnabled>false</CompressionEnabled>
   </PropertyGroup>
 
   <ItemGroup>
@@ -19,6 +23,9 @@
   <ItemGroup>
     <ProjectReference Include="..\Imbalances.Core\Imbalances.Core.csproj" />
     <ProjectReference Include="..\Imbalances.Infrastructure\Imbalances.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
   </ItemGroup>
 
 </Project>

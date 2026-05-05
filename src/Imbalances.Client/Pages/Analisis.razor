@@ -7,140 +7,114 @@
 @inject IAuditoriaService AuditoriaService
 @inject IJSRuntime JSRuntime
 @inject UiFeedbackService Ui
+@using Imbalances.Client.Models
 
 <PageTitle>Analisis - Imbalances</PageTitle>
 
-<MudText Typo="Typo.h4" Class="mb-6" Style="color: #002C54; font-weight: 700;">ANALISIS DE IMBALANCES</MudText>
+<AppPageContainer PageKey="analisis" Title="ANALISIS DE IMBALANCES" Components="_snapshotComponents">
+    <Toolbar>
+        <AppToolbar PageKey="analisis" OnAction="HandleToolbar" IsEnabled="IsToolbarEnabled" />
+    </Toolbar>
 
-@if (!string.IsNullOrWhiteSpace(_initError))
-{
-    <MudAlert Severity="Severity.Error" Variant="Variant.Filled" Class="mb-6">
-        @_initError
-    </MudAlert>
-}
+    <ChildContent>
+        @if (!string.IsNullOrWhiteSpace(_initError))
+        {
+            <MudAlert Severity="Severity.Error" Variant="Variant.Filled">
+                @_initError
+            </MudAlert>
+        }
 
-@if (!TieneDatos)
-{
-    <MudAlert Severity="Severity.Info" Class="mt-4">No hay datos procesados. Inicie la extraccion en el Explorador primero.</MudAlert>
-}
-else
-{
-    @if (!_hayResultados && _empresasConfiguradas > 0)
-    {
-        <MudAlert Severity="Severity.Info" Class="mt-4 mb-4">Aún no hay extracción. Se muestra el análisis base con la configuración actual.</MudAlert>
-    }
+        @if (!TieneDatos)
+        {
+            <MudAlert Severity="Severity.Info">No hay datos procesados. Inicie la extraccion en el Explorador primero.</MudAlert>
+        }
+        else
+        {
+            @if (!_hayResultados && _empresasConfiguradas > 0)
+            {
+                <MudAlert Severity="Severity.Info">Aún no hay extracción. Se muestra el análisis base con la configuración actual.</MudAlert>
+            }
 
-    <MudGrid Class="mb-6">
-        <MudItem xs="12" md="3">
-            <MudPaper Elevation="0" Class="pa-4 metric-card">
-                <MudText Typo="Typo.caption" Color="Color.Secondary">Registros</MudText>
-                <MudText Typo="Typo.h5" Style="font-weight: 700;">@ExplorerState.Resultados.Count</MudText>
-            </MudPaper>
-        </MudItem>
-        <MudItem xs="12" md="3">
-            <MudPaper Elevation="0" Class="pa-4 metric-card">
-                <MudText Typo="Typo.caption" Color="Color.Secondary">Hallazgos</MudText>
-                <MudText Typo="Typo.h5" Style="font-weight: 700; color: #B71C1C;">@ExplorerState.Hallazgos.Count</MudText>
-            </MudPaper>
-        </MudItem>
-        <MudItem xs="12" md="3">
-            <MudPaper Elevation="0" Class="pa-4 metric-card">
-                <MudText Typo="Typo.caption" Color="Color.Secondary">Reportes faltantes</MudText>
-                <MudText Typo="Typo.h5" Style="font-weight: 700;">@DocumentosFaltantes</MudText>
-            </MudPaper>
-        </MudItem>
-        <MudItem xs="12" md="3">
-            <MudPaper Elevation="0" Class="pa-4 metric-card">
-                <MudText Typo="Typo.caption" Color="Color.Secondary">Diferencia absoluta</MudText>
-                <MudText Typo="Typo.h5" Style="font-weight: 700;">@DiferenciaAbsoluta.ToString("N2")</MudText>
-            </MudPaper>
-        </MudItem>
-    </MudGrid>
-
-    <MudPaper Elevation="0" Class="pa-4 mb-6 audit-panel">
-        <MudText Typo="Typo.h6" Class="mb-3" Style="color: #002C54; font-weight: 700;">DISPONIBILIDAD DOCUMENTAL</MudText>
-        <MudDataGrid Items="@ExplorerState.DocumentosVerificados" Dense="true" Hover="true" Striped="true" FixedHeader="true" Height="220px" Class="grid-lines" ColumnResizeMode="ResizeMode.Container" HorizontalScrollbar="true">
-            <Columns>
-                <PropertyColumn Property="x => x.Empresa" Title="Empresa" />
-                <PropertyColumn Property="x => x.Reporte" Title="Reporte" />
-                <TemplateColumn Title="Estado">
-                    <CellTemplate>
-                        <MudChip T="string" Color="@(context.Item.Presente ? Color.Success : Color.Error)" Variant="Variant.Outlined" Size="Size.Small">
-                            @(context.Item.Presente ? "Presente" : "Faltante")
-                        </MudChip>
-                    </CellTemplate>
-                </TemplateColumn>
-                <PropertyColumn Property="x => x.ArchivoEncontrado" Title="Archivo" />
-                <PropertyColumn Property="x => x.ArchivoRegex" Title="Patron" />
-            </Columns>
-        </MudDataGrid>
-    </MudPaper>
-
-    <MudPaper Elevation="0" Class="pa-4 mb-6 audit-panel">
-        <MudText Typo="Typo.h6" Class="mb-3" Style="color: #002C54; font-weight: 700;">AUDITORIA DE RECIPROCIDAD</MudText>
-        <MudDataGrid Items="@ExplorerState.Reciprocidades" Dense="true" Hover="true" Striped="true" FixedHeader="true" Height="260px" Class="grid-lines" ColumnResizeMode="ResizeMode.Container" HorizontalScrollbar="true">
-            <Columns>
-                <PropertyColumn Property="x => x.EmpresaCxc" Title="Entidad CxC" />
-                <PropertyColumn Property="x => x.EmpresaCxp" Title="Entidad CxP" />
-                <PropertyColumn Property="x => x.GrupoReciprocidad" Title="Grupo" />
-                <PropertyColumn Property="x => x.ValorCxc" Title="CxC" Format="N2" />
-                <PropertyColumn Property="x => x.ValorCxp" Title="CxP" Format="N2" />
-                <PropertyColumn Property="x => x.Diferencia" Title="Diferencia" Format="N2" />
-                <TemplateColumn Title="Control">
-                    <CellTemplate>
-                        <MudChip T="string" Color="@(context.Item.DentroTolerancia ? Color.Success : Color.Warning)" Variant="Variant.Outlined" Size="Size.Small">
-                            @(context.Item.DentroTolerancia ? "OK" : "Revisar")
-                        </MudChip>
-                    </CellTemplate>
-                </TemplateColumn>
-            </Columns>
-        </MudDataGrid>
-    </MudPaper>
-
-    <MudPaper Elevation="0" Class="pa-4 audit-panel">
-        <div class="d-flex justify-space-between align-center mb-3">
-            <MudText Typo="Typo.h6" Style="color: #002C54; font-weight: 700;">PANEL DE DISCONFORMIDADES</MudText>
-            <div class="app-button-bar">
-                <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="ReconstruirAuditoriaAsync">Recalcular</MudButton>
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="PersistirHallazgosEnOrigen" Disabled="@(!ExplorerState.Hallazgos.Any())">Persistir en Excel</MudButton>
+            <div class="analysis-metrics">
+                <AppCard Title="Registros" Collapsible="false">
+                    <div class="analysis-metric-value">@ExplorerState.Resultados.Count</div>
+                </AppCard>
+                <AppCard Title="Hallazgos" Collapsible="false">
+                    <div class="analysis-metric-value analysis-metric-value--danger">@ExplorerState.Hallazgos.Count</div>
+                </AppCard>
+                <AppCard Title="Reportes faltantes" Collapsible="false">
+                    <div class="analysis-metric-value">@DocumentosFaltantes</div>
+                </AppCard>
+                <AppCard Title="Diferencia absoluta" Collapsible="false">
+                    <div class="analysis-metric-value">@DiferenciaAbsoluta.ToString("N2")</div>
+                </AppCard>
             </div>
-        </div>
 
-        <MudDataGrid Items="@ExplorerState.Hallazgos" Dense="true" Hover="true" Striped="true" FixedHeader="true" Height="420px" Class="grid-lines" ColumnResizeMode="ResizeMode.Container" HorizontalScrollbar="true">
-            <Columns>
-                <PropertyColumn Property="x => x.Tipo" Title="Tipo" />
-                <PropertyColumn Property="x => x.Severidad" Title="Severidad" />
-                <PropertyColumn Property="x => x.Empresa" Title="Empresa" />
-                <PropertyColumn Property="x => x.Contraparte" Title="Contraparte" />
-                <PropertyColumn Property="x => x.Cuenta" Title="Cuenta/Grupo" />
-                <PropertyColumn Property="x => x.Reporte" Title="Reporte" />
-                <PropertyColumn Property="x => x.Diferencia" Title="Diferencia" Format="N2" />
-                <TemplateColumn Title="Estado">
-                    <CellTemplate>
-                        <MudSelect T="string" Value="@context.Item.Estado" ValueChanged="@((value) => CambiarEstadoHallazgo(context.Item, value))" Margin="Margin.Dense" Variant="Variant.Outlined" Dense="true">
-                            <MudSelectItem Value="@("Pendiente")">Pendiente</MudSelectItem>
-                            <MudSelectItem Value="@("Revisado")">Revisado</MudSelectItem>
-                            <MudSelectItem Value="@("Corregido")">Corregido</MudSelectItem>
-                            <MudSelectItem Value="@("Descartado")">Descartado</MudSelectItem>
-                        </MudSelect>
-                    </CellTemplate>
-                </TemplateColumn>
-                <PropertyColumn Property="x => x.Detalle" Title="Detalle" />
-            </Columns>
-        </MudDataGrid>
-    </MudPaper>
-}
+            <AppCard Title="DISPONIBILIDAD DOCUMENTAL">
+                <AppGrid TItem="DocumentoVerificado" Items="@ExplorerState.DocumentosVerificados" Selectable="false">
+                    <Columns>
+                        <AppGridColumn TItem="DocumentoVerificado" Title="Empresa" ValueSelector="x => x.Empresa" />
+                        <AppGridColumn TItem="DocumentoVerificado" Title="Reporte" ValueSelector="x => x.Reporte" />
+                        <AppGridColumn TItem="DocumentoVerificado" Title="Estado">
+                            <CellTemplate Context="item">
+                                <MudChip T="string" Color="@(item.Presente ? Color.Success : Color.Error)" Variant="Variant.Outlined" Size="Size.Small">@(item.Presente ? "Presente" : "Faltante")</MudChip>
+                            </CellTemplate>
+                        </AppGridColumn>
+                        <AppGridColumn TItem="DocumentoVerificado" Title="Archivo" ValueSelector="x => x.ArchivoEncontrado" />
+                        <AppGridColumn TItem="DocumentoVerificado" Title="Patron" ValueSelector="x => x.ArchivoRegex" />
+                    </Columns>
+                </AppGrid>
+            </AppCard>
 
-<style>
-    .metric-card,
-    .audit-panel {
-        border: 1px solid var(--surface-border);
-        border-radius: 8px;
-        background-color: #FFFFFF;
-    }
-</style>
+            <AppCard Title="AUDITORIA DE RECIPROCIDAD">
+                <AppGrid TItem="ReciprocidadResultado" Items="@ExplorerState.Reciprocidades" Selectable="false">
+                    <Columns>
+                        <AppGridColumn TItem="ReciprocidadResultado" Title="Entidad CxC" ValueSelector="x => x.EmpresaCxc" />
+                        <AppGridColumn TItem="ReciprocidadResultado" Title="Entidad CxP" ValueSelector="x => x.EmpresaCxp" />
+                        <AppGridColumn TItem="ReciprocidadResultado" Title="Grupo" ValueSelector="x => x.GrupoReciprocidad" />
+                        <AppGridColumn TItem="ReciprocidadResultado" Title="CxC" ValueSelector="x => x.ValorCxc" />
+                        <AppGridColumn TItem="ReciprocidadResultado" Title="CxP" ValueSelector="x => x.ValorCxp" />
+                        <AppGridColumn TItem="ReciprocidadResultado" Title="Diferencia" ValueSelector="x => x.Diferencia" />
+                        <AppGridColumn TItem="ReciprocidadResultado" Title="Control">
+                            <CellTemplate Context="item">
+                                <MudChip T="string" Color="@(item.DentroTolerancia ? Color.Success : Color.Warning)" Variant="Variant.Outlined" Size="Size.Small">@(item.DentroTolerancia ? "OK" : "Revisar")</MudChip>
+                            </CellTemplate>
+                        </AppGridColumn>
+                    </Columns>
+                </AppGrid>
+            </AppCard>
+
+            <AppCard Title="PANEL DE DISCONFORMIDADES">
+                <AppGrid TItem="HallazgoVerificacion" Items="@ExplorerState.Hallazgos" Selectable="false">
+                    <Columns>
+                        <AppGridColumn TItem="HallazgoVerificacion" Title="Tipo" ValueSelector="x => x.Tipo" />
+                        <AppGridColumn TItem="HallazgoVerificacion" Title="Severidad" ValueSelector="x => x.Severidad" />
+                        <AppGridColumn TItem="HallazgoVerificacion" Title="Empresa" ValueSelector="x => x.Empresa" />
+                        <AppGridColumn TItem="HallazgoVerificacion" Title="Contraparte" ValueSelector="x => x.Contraparte" />
+                        <AppGridColumn TItem="HallazgoVerificacion" Title="Cuenta/Grupo" ValueSelector="x => x.Cuenta" />
+                        <AppGridColumn TItem="HallazgoVerificacion" Title="Reporte" ValueSelector="x => x.Reporte" />
+                        <AppGridColumn TItem="HallazgoVerificacion" Title="Diferencia" ValueSelector="x => x.Diferencia" />
+                        <AppGridColumn TItem="HallazgoVerificacion" Title="Estado">
+                            <CellTemplate Context="item">
+                                <MudSelect T="string" Value="@item.Estado" ValueChanged="@((value) => CambiarEstadoHallazgo(item, value))" Margin="Margin.Dense" Variant="Variant.Outlined" Dense="true">
+                                    <MudSelectItem Value="@("Pendiente")">Pendiente</MudSelectItem>
+                                    <MudSelectItem Value="@("Revisado")">Revisado</MudSelectItem>
+                                    <MudSelectItem Value="@("Corregido")">Corregido</MudSelectItem>
+                                    <MudSelectItem Value="@("Descartado")">Descartado</MudSelectItem>
+                                </MudSelect>
+                            </CellTemplate>
+                        </AppGridColumn>
+                        <AppGridColumn TItem="HallazgoVerificacion" Title="Detalle" ValueSelector="x => x.Detalle" />
+                    </Columns>
+                </AppGrid>
+            </AppCard>
+        }
+    </ChildContent>
+</AppPageContainer>
 
 @code {
+    private readonly IReadOnlyList<string> _snapshotComponents = new[] { "AppPageContainer", "AppCard", "AppGrid", "AppToolbar" };
+
     private bool TieneDatos =>
         ExplorerState.Resultados.Any() ||
         ExplorerState.Hallazgos.Any() ||
@@ -152,6 +126,28 @@ else
     private string? _initError;
     private bool _hayResultados;
     private int _empresasConfiguradas;
+
+    private bool IsToolbarEnabled(string id)
+    {
+        return id switch
+        {
+            "persistExcel" => ExplorerState.Hallazgos.Any(),
+            _ => true
+        };
+    }
+
+    private async Task HandleToolbar(string id)
+    {
+        switch (id)
+        {
+            case "recalcular":
+                await ReconstruirAuditoriaAsync();
+                break;
+            case "persistExcel":
+                await PersistirHallazgosEnOrigen();
+                break;
+        }
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -266,7 +262,7 @@ else
         }
     }
 
-    private IEnumerable<Home.TreeItemData> ObtenerArchivosConReferencia()
+    private IEnumerable<FileTreeItem> ObtenerArchivosConReferencia()
     {
         foreach (var item in Recorrer(ExplorerState.TreeItems))
         {
@@ -277,7 +273,7 @@ else
         }
     }
 
-    private static IEnumerable<Home.TreeItemData> Recorrer(IEnumerable<Home.TreeItemData> items)
+    private static IEnumerable<FileTreeItem> Recorrer(IEnumerable<FileTreeItem> items)
     {
         foreach (var item in items)
         {
@@ -292,6 +288,7 @@ else
 
     private void AplicarEstadoPersistido(PersistenceState savedState)
     {
+        ExplorerState.FunctionsBaseUrl = savedState.FunctionsBaseUrl;
         ExplorerState.Resultados = savedState.Resultados;
         ExplorerState.Hallazgos = savedState.Hallazgos;
         ExplorerState.DocumentosVerificados = savedState.DocumentosVerificados;
@@ -306,6 +303,7 @@ else
     {
         await StatePersistence.GuardarEstadoAsync(new PersistenceState
         {
+            FunctionsBaseUrl = ExplorerState.FunctionsBaseUrl,
             Resultados = ExplorerState.Resultados,
             Hallazgos = ExplorerState.Hallazgos,
             DocumentosVerificados = ExplorerState.DocumentosVerificados,

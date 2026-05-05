@@ -1,0 +1,162 @@
+@using Imbalances.Client.UI.Core
+@using Microsoft.JSInterop
+@typeparam TItem
+@inject UiConfigService UiConfig
+@inject IJSRuntime JS
+
+<div class="app-grid" data-grid-id="@_gridId">
+    <div class="app-grid__scroll" data-grid-scroll>
+        <table class="app-grid__table" data-grid-table>
+            <colgroup>
+                @if (Selectable)
+                {
+                    <col data-col-index="-1" />
+                }
+                @for (var i = 0; i < _columns.Count; i++)
+                {
+                    <col data-col-index="@i" />
+                }
+            </colgroup>
+            <thead class="app-grid__thead">
+                <tr>
+                    @if (Selectable)
+                    {
+                        <th class="app-grid__th app-grid__th--select">
+                            <input type="checkbox" class="app-grid__chk" @onchange="ToggleAll" checked="@AllSelected" />
+                        </th>
+                    }
+                    @for (var i = 0; i < _columns.Count; i++)
+                    {
+                        <th class="app-grid__th" data-col-index="@i">
+                            <div class="app-grid__th-inner">
+                                <span class="app-grid__th-text">@_columns[i].Title</span>
+                                @if (_resizable)
+                                {
+                                    <span class="app-grid__resize" data-resize-handle data-col-index="@i"></span>
+                                }
+                            </div>
+                        </th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @if (_items.Count == 0)
+                {
+                    <tr>
+                        <td class="app-grid__empty" colspan="@ColSpan">Sin registros para mostrar.</td>
+                    </tr>
+                }
+                else
+                {
+                    @for (var rowIndex = 0; rowIndex < _items.Count; rowIndex++)
+                    {
+                        var item = _items[rowIndex];
+                        var selected = SelectedIndexes.Contains(rowIndex);
+                        <tr class="@(selected ? "app-grid__tr app-grid__tr--selected" : "app-grid__tr")">
+                            @if (Selectable)
+                            {
+                                <td class="app-grid__td app-grid__td--select">
+                                    <input type="checkbox" class="app-grid__chk" checked="@selected" @onchange="(e) => ToggleRow(rowIndex, e)" />
+                                </td>
+                            }
+                            @for (var colIndex = 0; colIndex < _columns.Count; colIndex++)
+                            {
+                                <td class="app-grid__td">
+                                    @if (_columns[colIndex].CellTemplate != null)
+                                    {
+                                        @_columns[colIndex].CellTemplate!(item)
+                                    }
+                                    else
+                                    {
+                                        var value = _columns[colIndex].ValueSelector?.Invoke(item);
+                                        var text = FormatValue(value);
+                                        <span class="app-grid__cell" title="@text">@text</span>
+                                    }
+                                </td>
+                            }
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+    <CascadingValue Value="this">
+        @Columns
+    </CascadingValue>
+</div>
+
+@code {
+    [Parameter] public IEnumerable<TItem> Items { get; set; } = Array.Empty<TItem>();
+    [Parameter] public RenderFragment? Columns { get; set; }
+    [Parameter] public bool Selectable { get; set; } = true;
+    [Parameter] public HashSet<int> SelectedIndexes { get; set; } = new();
+    [Parameter] public EventCallback<HashSet<int>> SelectedIndexesChanged { get; set; }
+
+    private readonly string _gridId = Guid.NewGuid().ToString("N");
+    private readonly List<AppGridColumn<TItem>> _columns = new();
+    private List<TItem> _items = new();
+    private bool _resizable;
+    private int _minColWidth;
+
+    public void RegisterColumn(AppGridColumn<TItem> col)
+    {
+        _columns.Add(col);
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _items = Items.ToList();
+        var cfg = await UiConfig.GetAsync();
+        _resizable = cfg.Grid.ResizableColumns;
+        _minColWidth = cfg.Grid.MinColumnWidth;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        if (!_resizable) return;
+        try
+        {
+            await JS.InvokeVoidAsync("appGrid.init", _gridId, _minColWidth);
+        }
+        catch
+        {
+        }
+    }
+
+    private int ColSpan => _columns.Count + (Selectable ? 1 : 0);
+
+    private bool AllSelected => _items.Count > 0 && SelectedIndexes.Count == _items.Count;
+
+    private async Task ToggleAll(ChangeEventArgs e)
+    {
+        var checkedValue = e.Value is bool b && b;
+        var next = new HashSet<int>();
+        if (checkedValue)
+        {
+            for (var i = 0; i < _items.Count; i++) next.Add(i);
+        }
+        await SelectedIndexesChanged.InvokeAsync(next);
+    }
+
+    private async Task ToggleRow(int rowIndex, ChangeEventArgs e)
+    {
+        var checkedValue = e.Value is bool b && b;
+        var next = new HashSet<int>(SelectedIndexes);
+        if (checkedValue) next.Add(rowIndex);
+        else next.Remove(rowIndex);
+        await SelectedIndexesChanged.InvokeAsync(next);
+    }
+
+    private static string FormatValue(object? value)
+    {
+        if (value == null) return string.Empty;
+        return value switch
+        {
+            decimal d => d.ToString("N2"),
+            double d => d.ToString("N2"),
+            float f => f.ToString("N2"),
+            _ => value.ToString() ?? string.Empty
+        };
+    }
+}

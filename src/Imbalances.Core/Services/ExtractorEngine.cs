@@ -9,147 +9,38 @@ namespace Imbalances.Core.Services;
 
 public class ExtractorEngine : IExtractorEngine
 {
-    private readonly IExcelProvider _excelProvider;
+    private readonly IMotor1Extractor _motor1;
 
-    public ExtractorEngine(IExcelProvider excelProvider)
+    public ExtractorEngine(IMotor1Extractor motor1)
     {
-        _excelProvider = excelProvider;
+        _motor1 = motor1;
     }
 
     public async Task<List<RegistroContable>> ProcesarArchivoAsync(string filePath, Stream fileStream, ConfiguracionCore config, Action<string>? onProgressLog = null)
     {
-        var resultados = new List<RegistroContable>();
         var nombreArchivo = Path.GetFileName(filePath);
-
-        onProgressLog?.Invoke($"[Info] Procesando {nombreArchivo}");
-
-        var empresa = config.Empresas.FirstOrDefault(e => filePath.Contains(e.NombreCarpeta, StringComparison.OrdinalIgnoreCase));
-        if (empresa == null)
+        var movimientos = await ProcesarArchivoMotor1Async(filePath, fileStream, config, periodo: string.Empty, onProgressLog);
+        var resultados = movimientos.Select(m => new RegistroContable
         {
-            onProgressLog?.Invoke($"[Info] Empresa no detectada para {nombreArchivo} → SKIP");
-            return resultados;
-        }
-
-        onProgressLog?.Invoke($"[Info] Empresa detectada: {empresa.NombreEmpresa}");
-
-        var workbook = await _excelProvider.OpenAsync(fileStream);
-        
-        var balance = workbook.Worksheets.FirstOrDefault(w => w.Name.Contains("Balance", StringComparison.OrdinalIgnoreCase));
-        if (balance == null)
-        {
-            onProgressLog?.Invoke($"[Error] No hay hoja 'Balance' en {nombreArchivo}");
-            return resultados;
-        }
-
-        onProgressLog?.Invoke($"[Info] Leyendo Balance: Cuenta (Col C) → Nota (Col dinámicamente)");
-
-        int totalFilas = 0;
-        int cuentasConfiguradas = 0;
-        int notasProcesadas = 0;
-        int notasIgnoradas = 0;
-
-        foreach (var row in balance.Rows)
-        {
-            totalFilas++;
-            var nombreCuenta = row.GetCell("C").Trim(); 
-            if (string.IsNullOrEmpty(nombreCuenta)) continue;
-
-            var cuentaConfig = config.Cuentas.FirstOrDefault(c => c.NombreCuenta.Equals(nombreCuenta, StringComparison.OrdinalIgnoreCase));
-            
-            if (cuentaConfig == null) 
-            {
-                onProgressLog?.Invoke($"[Info] Fila {totalFilas}: Cuenta '{nombreCuenta}' no configurada → SKIP");
-                continue;
-            }
-
-            var notaRaw = row.GetCell(cuentaConfig.ColumnaNota).Trim();
-            if (string.IsNullOrEmpty(notaRaw)) 
-            {
-                onProgressLog?.Invoke($"[Info] Fila {totalFilas}: Sin nota en columna {cuentaConfig.ColumnaNota} → SKIP");
-                notasIgnoradas++;
-                continue;
-            }
-
-            // Validar que la nota sea numérica y esté en el rango permitido (1-20)
-            if (!int.TryParse(notaRaw, out int numeroNota) || numeroNota < 1 || numeroNota > 20)
-            {
-                onProgressLog?.Invoke($"[Info] Fila {totalFilas}: Nota {notaRaw} no permitida para '{nombreCuenta}' → SKIP");
-                notasIgnoradas++;
-                continue;
-            }
-
-            var nombreHoja = $"Nota {notaRaw}".Trim();
-            var hojaNota = workbook.GetWorksheet(nombreHoja);
-
-            if (hojaNota == null) 
-            {
-                onProgressLog?.Invoke($"[Info] Fila {totalFilas}: Hoja 'Nota {notaRaw}' no encontrada → SKIP");
-                notasIgnoradas++;
-                continue;
-            }
-
-            int registrosLeidos = 0;
-            notasProcesadas++;
-            cuentasConfiguradas++;
-
-            foreach (var rowNota in hojaNota.Rows)
-            {
-                var descripcionRaw = rowNota.GetCell("C").Trim();
-                if (string.IsNullOrEmpty(descripcionRaw)) continue;
-
-                bool coincide = descripcionRaw.Contains(cuentaConfig.NombreCuenta, StringComparison.OrdinalIgnoreCase);
-
-                if (!coincide) continue;
-
-                var valorStr = rowNota.GetCell(cuentaConfig.ColumnaValor);
-                var valor = ParseDecimal(valorStr);
-                
-                if (valor != 0)
-                {
-                    registrosLeidos++;
-                    resultados.Add(new RegistroContable
-                    {
-                        Empresa = empresa.NombreEmpresa,
-                        Cuenta = cuentaConfig.NombreCuenta,
-                        Categoria = cuentaConfig.Tipo,
-                        Tipo = cuentaConfig.Tipo,
-                        Nota = notaRaw,
-                        Valor = valor,
-                        ArchivoOrigen = nombreArchivo,
-                        HojaOrigen = hojaNota.Name,
-                        TextoOrigen = descripcionRaw
-                    });
-                }
-            }
-
-            if (registrosLeidos > 0)
-            {
-                onProgressLog?.Invoke($"[Info] Cuenta: {cuentaConfig.NombreCuenta} | Nota: {notaRaw} | Registros: {registrosLeidos}");
-            }
-        }
-
-        // Generar resumen
-        onProgressLog?.Invoke("[Info] --- RESUMEN ---");
-        onProgressLog?.Invoke($"[Info] Filas leídas del Balance: {totalFilas}");
-        onProgressLog?.Invoke($"[Info] Cuentas configuradas encontradas: {cuentasConfiguradas}");
-        onProgressLog?.Invoke($"[Info] Notas procesadas: {notasProcesadas}");
-        onProgressLog?.Invoke($"[Info] Notas ignoradas: {notasIgnoradas}");
-        onProgressLog?.Invoke($"[Info] Total registros extraídos: {resultados.Count}");
-        onProgressLog?.Invoke($"[Info] Extracción finalizada para {empresa.NombreEmpresa}");
+            Empresa = m.EmpresaOrigen,
+            EmpresaContraparte = m.EmpresaContraparte,
+            Cuenta = m.Cuenta,
+            Categoria = m.Tipo,
+            Tipo = m.Tipo,
+            Nota = m.Nota,
+            Valor = m.Valor,
+            ArchivoOrigen = nombreArchivo,
+            HojaOrigen = string.IsNullOrWhiteSpace(m.Nota) ? string.Empty : $"Nota {m.Nota}",
+            TextoOrigen = m.EmpresaContraparte
+        }).ToList();
 
         return resultados;
+
     }
 
-    private decimal ParseDecimal(string value)
+    public async Task<List<Movimiento>> ProcesarArchivoMotor1Async(string filePath, Stream fileStream, ConfiguracionCore config, string periodo = "", Action<string>? onProgressLog = null)
     {
-        if (string.IsNullOrWhiteSpace(value)) return 0;
-        value = value.Replace("$", "").Replace(" ", "");
-        if (value.Contains(",") && value.Contains("."))
-            value = value.Replace(".", "").Replace(",", ".");
-        else if (value.Contains(","))
-            value = value.Replace(",", ".");
-        
-        return decimal.TryParse(value, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out decimal res) ? res : 0;
+        return await _motor1.ExtraerAsync(filePath, fileStream, config, periodo, onProgressLog);
     }
 
     public IEnumerable<object> Consolidar(List<RegistroContable> resultados)

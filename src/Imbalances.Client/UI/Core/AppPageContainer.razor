@@ -1,0 +1,72 @@
+@using Imbalances.Client.UI.Core
+@inject UiConfigService UiConfig
+@inject UiSnapshotService Snapshots
+
+<div class="app-page">
+    @if (!string.IsNullOrWhiteSpace(Title) || Toolbar != null)
+    {
+        <div class="app-page__header">
+            @if (!string.IsNullOrWhiteSpace(Title))
+            {
+                <div class="app-page__title">
+                    <h1 class="app-page__title-text">@Title</h1>
+                </div>
+            }
+            @if (Toolbar != null && string.Equals(_toolbarPosition, "top", StringComparison.OrdinalIgnoreCase))
+            {
+                <div class="app-page__actions">
+                    @Toolbar
+                </div>
+            }
+        </div>
+    }
+    <div class="app-page__content">
+        @ChildContent
+    </div>
+
+    @if (Toolbar != null && !string.Equals(_toolbarPosition, "top", StringComparison.OrdinalIgnoreCase))
+    {
+        <div class="app-page__footer @(_toolbarSticky ? "app-page__footer--sticky" : string.Empty)" style="--app-toolbar-bottom-offset: @_toolbarBottomOffsetPx">
+            @Toolbar
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public string PageKey { get; set; } = string.Empty;
+    [Parameter] public string Title { get; set; } = string.Empty;
+    [Parameter] public RenderFragment? Toolbar { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public IReadOnlyList<string> Components { get; set; } = Array.Empty<string>();
+
+    private string _toolbarPosition = "bottom";
+    private bool _toolbarSticky = true;
+    private int _toolbarBottomOffset = 16;
+    private string _toolbarBottomOffsetPx => $"{_toolbarBottomOffset}px";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (string.IsNullOrWhiteSpace(PageKey)) return;
+        var cfg = await UiConfig.GetAsync();
+        var page = await UiConfig.GetPageAsync(PageKey);
+        var layout = page.Layout ?? cfg.Layout;
+        _toolbarPosition = layout.ToolbarPosition;
+        _toolbarSticky = layout.ToolbarSticky;
+        _toolbarBottomOffset = layout.ToolbarBottomOffset;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        if (string.IsNullOrWhiteSpace(PageKey)) return;
+
+        var cfg = await UiConfig.GetAsync();
+        await Snapshots.SaveSnapshotAsync(new UiSnapshot
+        {
+            Page = PageKey,
+            Components = Components.ToList(),
+            TimestampUtc = DateTime.UtcNow,
+            UiConfig = cfg
+        });
+    }
+}

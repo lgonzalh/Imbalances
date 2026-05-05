@@ -1,0 +1,48 @@
+{
+  "layout": {
+    "toolbarPosition": "bottom",
+    "toolbarSticky": true,
+    "toolbarBottomOffset": 16
+  },
+  "grid": {
+    "scrollHorizontal": true,
+    "resizableColumns": true,
+    "minColumnWidth": 120
+  },
+  "card": {
+    "collapsible": true,
+    "defaultExpanded": true
+  },
+  "toolbar": {
+    "showAdd": true,
+    "showDelete": true,
+    "showSave": true,
+    "showImport": true,
+    "showExport": true,
+    "showLog": true,
+    "actions": []
+  },
+  "pages": {
+    "config": {
+      "toolbar": {
+        "actions": [
+          { "id": "export", "label": "Exportar", "variant": "secondary" },
+          { "id": "import", "label": "Importar", "variant": "secondary", "filePicker": true, "accept": ".xlsx", "multiple": false },
+          { "id": "log", "label": "Log", "variant": "secondary" },
+          { "id": "delete", "label": "Eliminar", "variant": "danger" },
+          { "id": "save", "label": "Guardar", "variant": "primary" }
+        ]
+      }
+    },
+    "analisis": {
+      "toolbar": {
+        "actions": [
+          { "id": "export", "label": "Exportar", "variant": "secondary" },
+          { "id": "log", "label": "Log", "variant": "secondary" },
+          { "id": "save", "label": "Guardar", "variant": "primary" }
+        ]
+      }
+    }
+  }
+}
+

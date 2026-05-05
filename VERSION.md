@@ -1,53 +1,47 @@
 # Imbalances - Registro de Versiones
 
-## v1.1.10 (2026-05-04)
+## v1.1.15 (2026-05-05)
 
 ### ✅ Cambios Realizados:
 
-1. **Actualización de Versión**:
-   - Actualizado número de versión de v1.1.9 a v1.1.10 en `MainLayout.razor` y archivos `.csproj`.
+1. **Acciones siempre abajo (global)**:
+   - Se agregó configuración central `layout.toolbarPosition = "bottom"` en `UI/Config/ui-config.json`.
+   - `AppPageContainer` renderiza la toolbar al final (sticky configurable), para que los botones no aparezcan en el encabezado.
 
-## v1.1.9 (2026-05-03)
-
-### ✅ Cambios Realizados:
-
-1. **Actualización de Versión**:
-   - Actualizado número de versión de v1.1.8 a v1.1.9 en `MainLayout.razor` y archivos `.csproj`.
-
-## v1.1.8 (2026-05-03)
+## v1.1.14 (2026-05-05)
 
 ### ✅ Cambios Realizados:
 
-1. **Actualización de Versión**: 
-   - Actualizado número de versión de v1.1.7 a v1.1.8 en MainLayout.razor
+1. **Explorador (filtro y consistencia)**:
+   - Se eliminó overflow horizontal no deseado en el árbol.
+   - El filtro ahora afecta también la lista derecha y el contador de seleccionados.
 
-2. **Mejora en el Módulo Explorador**:
-   - ✅ **Botón Iniciar**: Funciona correctamente - procesa archivos Excel seleccionados
-   - ✅ **Logs de Procesamiento**: Muestra paso a paso el progreso con timestamps
-   - ✅ **Exportación de Logs**: Función completa para exportar logs a archivo de texto
-   - ✅ **Barra de Progreso Visual**: **NUEVO** - Agregada barra de progreso linear mostrando:
-     - Porcentaje de avance (archivo X de Y)
-     - Etapa actual del procesamiento
-     - Animación con efecto striped
+## v1.1.13 (2026-05-05)
 
-### 📊 Funcionalidades Verificadas:
+### ✅ Cambios Realizados:
 
-- **Explorador de Archivos**: ✅ Carga carpetas/archivos Excel (.xlsx, .xls)
-- **Árbol de Navegación**: ✅ Estructura jerárquica con carpetas expandibles
-- **Filtro de Búsqueda**: ✅ Búsqueda en tiempo real sobre archivos
-- **Selección Múltiple**: ✅ Checkboxes para seleccionar archivos a procesar
-- **Procesamiento**: ✅ Extracción de datos de archivos Excel
-- **Logs Detallados**: ✅ Mensajes con timestamp, nivel (Info/Success/Error/Warning)
-- **Barra de Progreso**: ✅ **NUEVA** - Visual del progreso del procesamiento
+1. **Explorador (UI inmutable)**:
+   - Se restauró el layout clásico (árbol + orden de procesamiento) y se evitó que aparezcan inputs nativos "Choose Files".
+   - Se removió el header de página para mantener la ventana idéntica al diseño original.
 
-### 🔧 Estado del Sistema:
+## v1.1.12 (2026-05-04)
 
-- **Compilación**: ✅ Exitosa (con 9 advertencias menores de null reference)
-- **Módulo Explorador**: ✅ Totalmente funcional
-- **Botón Iniciar**: ✅ Activo y procesando archivos correctamente
-- **Logs Paso a Paso**: ✅ Mostrando progreso detallado archivo por archivo
-- **Barra de Progreso**: ✅ **NUEVA** - Visualización en tiempo real del progreso
+### ✅ Cambios Realizados:
 
-### 📝 Notas:
+1. **Estética global aplicada en Configuración**:
+   - Barra inferior de acciones y botones con estilo pill, bordes y colores corporativos.
+   - Estilos utilitarios agregados a `wwwroot/css/app.css` para reutilización.
 
-El sistema está completamente funcional. La barra de progreso ahora muestra visualmente el avance del procesamiento, complementando los logs de texto existentes.
+## v1.1.11 (2026-05-04)
+
+### ✅ Cambios Realizados:
+
+1. **UI/UX Configuración**:
+   - Pantalla `/config` ajustada a solo **GRID 1 (Empresas)** y **GRID 2 (Cuentas)**.
+   - Acciones movidas a una barra inferior: Exportar, Importar, Log (.txt), Eliminar seleccionados, Guardar cambios.
+
+2. **Descargas sin eval (seguridad)**:
+   - Exportación JSON y Log `.txt` usando helper JS dedicado.
+
+3. **Dev Server (Debug)**:
+   - Workaround para error de Static Web Assets compression en `dotnet run`.

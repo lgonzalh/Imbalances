@@ -1,0 +1,46 @@
+.app-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 14px;
+    border: 1px solid var(--color-border);
+    border-radius: 16px;
+    background: var(--color-surface);
+}
+
+.app-toolbar__label {
+    font-weight: 800;
+    color: var(--color-primary);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.app-toolbar__divider {
+    width: 1px;
+    align-self: stretch;
+    background: var(--color-border);
+}
+
+.app-toolbar__buttons {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    flex: 1;
+}
+
+::deep .app-toolbar__file {
+    display: none;
+}
+
+.app-toolbar__filename {
+    font-size: 13px;
+    color: var(--color-text-muted, #666);
+    margin-right: 5px;
+    font-weight: 500;
+}
+
+.app-btn--disabled {
+    opacity: 0.55;
+    pointer-events: none;
+}

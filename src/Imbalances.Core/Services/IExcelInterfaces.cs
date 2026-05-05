@@ -13,12 +13,14 @@ public interface IExcelRow
 public interface IExcelWorksheet
 {
     string Name { get; }
+    int RowCount { get; }
+    IExcelRow? GetRow(int rowNumber);
     IEnumerable<IExcelRow> Rows { get; }
 }
 
 public interface IExcelWorkbook
 {
-    IExcelWorksheet GetWorksheet(string name);
+    IExcelWorksheet? GetWorksheet(string name);
     IEnumerable<IExcelWorksheet> Worksheets { get; }
 }
 

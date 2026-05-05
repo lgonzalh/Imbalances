@@ -1,0 +1,21 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /empresas/{empresaId} {
+      allow read: if true;
+      allow write: if false;
+
+      match /periodos/{periodoId} {
+        allow read: if true;
+        allow write: if false;
+
+        match /movimientos/{movId} {
+          allow read: if true;
+          allow write: if false;
+        }
+      }
+    }
+  }
+}
+

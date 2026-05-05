@@ -7,82 +7,60 @@
 
 <PageTitle>Informe - Imbalances</PageTitle>
 
-<MudText Typo="Typo.h4" Class="mb-6" Style="color: #002C54; font-weight: 700;">INFORME DE IMBALANCES</MudText>
+<AppPageContainer PageKey="informe" Title="INFORME DE IMBALANCES" Components="_snapshotComponents">
+    <ChildContent>
+        @if (!ExplorerState.Resultados.Any())
+        {
+            <MudAlert Severity="Severity.Info">No hay datos procesados. Se muestran las empresas configuradas con totales en 0.</MudAlert>
+        }
 
-@if (!ExplorerState.Resultados.Any())
-{
-    <MudAlert Severity="Severity.Info" Class="mt-4 mb-4">No hay datos procesados. Se muestran las empresas configuradas con totales en 0.</MudAlert>
-}
-
-<MudExpansionPanels Elevation="1" MultiExpansion="true" Class="mt-4">
         @foreach (var item in Consolidado)
         {
-            var diffColor = item.Diferencia == 0 ? "#555960" : "#E65100";
-            var fontWeightDiff = item.Diferencia == 0 ? "500" : "700";
-
-            <MudExpansionPanel @key="item.Empresa">
-                <TitleContent>
-                    <div class="d-flex justify-space-between align-center" style="width: 100%;">
-                        <MudText Typo="Typo.h6" Style="color: #002C54; font-weight: 700; width: 35%;">@item.Empresa</MudText>
-                        <MudText Typo="Typo.body1" Style="font-weight: 600; color: #1D6F42; width: 20%;">Activos: @item.TotalCxC.ToString("N2")</MudText>
-                        <MudText Typo="Typo.body1" Style="font-weight: 600; color: #B71C1C; width: 20%;">Pasivos: @item.TotalCxP.ToString("N2")</MudText>
-                        <MudText Typo="Typo.body1" Style="@($"font-weight: {fontWeightDiff}; color: {diffColor}; width: 20%;")">Dif: @item.Diferencia.ToString("N2")</MudText>
+            <AppCard Title="@item.Empresa">
+                <HeaderActions>
+                    <div class="report-header-metrics">
+                        <div class="report-metric report-metric--success">Activos: @item.TotalCxC.ToString("N2")</div>
+                        <div class="report-metric report-metric--danger">Pasivos: @item.TotalCxP.ToString("N2")</div>
+                        <div class="report-metric report-metric--diff">Dif: @item.Diferencia.ToString("N2")</div>
                     </div>
-                </TitleContent>
+                </HeaderActions>
                 <ChildContent>
-                    <MudGrid>
-                        <MudItem xs="12" md="6">
-                            <MudDataGrid Items="@item.DetallesCxC" Dense="true" Hover="true" Striped="true" Elevation="0" Style="border: 1px solid var(--surface-border);" Class="grid-lines" ColumnResizeMode="ResizeMode.Container" HorizontalScrollbar="true" FixedHeader="true" Height="360px">
-                                <ToolBarContent>
-                                    <MudText Typo="Typo.subtitle1" Style="color: #1D6F42; font-weight: 700;">Detalle de Activos (CxC)</MudText>
-                                </ToolBarContent>
-                                <NoRecordsContent>
-                                    <MudText Typo="Typo.body2" Class="pa-4" Style="color: #555960;">Sin registros para mostrar.</MudText>
-                                </NoRecordsContent>
-                                <Columns>
-                                    <PropertyColumn Property="x => x.Cuenta" Title="Rubro Activo" />
-                                    <PropertyColumn Property="x => x.Nota" Title="Nota" />
-                                    <PropertyColumn Property="x => x.Valor" Title="Valor" Format="N2">
-                                        <CellTemplate>
-                                            <MudText Style="font-weight: 500; text-align: right; width: 100%; color: #1D6F42;">@context.Item.Valor.ToString("N2")</MudText>
-                                        </CellTemplate>
-                                    </PropertyColumn>
-                                </Columns>
-                            </MudDataGrid>
-                            <div class="d-flex justify-end mt-2">
-                                <MudText Typo="Typo.subtitle1" Style="font-weight: 700; color: #1D6F42;">Subtotal CxC: @item.TotalCxC.ToString("N2")</MudText>
-                            </div>
-                        </MudItem>
+                    <div class="report-detail-grid">
+                        <div class="report-col">
+                            <AppCard Title="Detalle de Activos (CxC)" Collapsible="false">
+                                <AppGrid TItem="RegistroContable" Items="@item.DetallesCxC" Selectable="false">
+                                    <Columns>
+                                        <AppGridColumn TItem="RegistroContable" Title="Rubro Activo" ValueSelector="x => x.Cuenta" />
+                                        <AppGridColumn TItem="RegistroContable" Title="Nota" ValueSelector="x => x.Nota" />
+                                        <AppGridColumn TItem="RegistroContable" Title="Valor" ValueSelector="x => x.Valor" />
+                                    </Columns>
+                                </AppGrid>
+                                <div class="report-subtotal report-subtotal--success">Subtotal CxC: @item.TotalCxC.ToString("N2")</div>
+                            </AppCard>
+                        </div>
 
-                        <MudItem xs="12" md="6">
-                            <MudDataGrid Items="@item.DetallesCxP" Dense="true" Hover="true" Striped="true" Elevation="0" Style="border: 1px solid var(--surface-border);" Class="grid-lines" ColumnResizeMode="ResizeMode.Container" HorizontalScrollbar="true" FixedHeader="true" Height="360px">
-                                <ToolBarContent>
-                                    <MudText Typo="Typo.subtitle1" Style="color: #B71C1C; font-weight: 700;">Detalle de Pasivos (CxP)</MudText>
-                                </ToolBarContent>
-                                <NoRecordsContent>
-                                    <MudText Typo="Typo.body2" Class="pa-4" Style="color: #555960;">Sin registros para mostrar.</MudText>
-                                </NoRecordsContent>
-                                <Columns>
-                                    <PropertyColumn Property="x => x.Cuenta" Title="Rubro Pasivo" />
-                                    <PropertyColumn Property="x => x.Nota" Title="Nota" />
-                                    <PropertyColumn Property="x => x.Valor" Title="Valor" Format="N2">
-                                        <CellTemplate>
-                                            <MudText Style="font-weight: 500; text-align: right; width: 100%; color: #B71C1C;">@context.Item.Valor.ToString("N2")</MudText>
-                                        </CellTemplate>
-                                    </PropertyColumn>
-                                </Columns>
-                            </MudDataGrid>
-                            <div class="d-flex justify-end mt-2">
-                                <MudText Typo="Typo.subtitle1" Style="font-weight: 700; color: #B71C1C;">Subtotal CxP: @item.TotalCxP.ToString("N2")</MudText>
-                            </div>
-                        </MudItem>
-                    </MudGrid>
+                        <div class="report-col">
+                            <AppCard Title="Detalle de Pasivos (CxP)" Collapsible="false">
+                                <AppGrid TItem="RegistroContable" Items="@item.DetallesCxP" Selectable="false">
+                                    <Columns>
+                                        <AppGridColumn TItem="RegistroContable" Title="Rubro Pasivo" ValueSelector="x => x.Cuenta" />
+                                        <AppGridColumn TItem="RegistroContable" Title="Nota" ValueSelector="x => x.Nota" />
+                                        <AppGridColumn TItem="RegistroContable" Title="Valor" ValueSelector="x => x.Valor" />
+                                    </Columns>
+                                </AppGrid>
+                                <div class="report-subtotal report-subtotal--danger">Subtotal CxP: @item.TotalCxP.ToString("N2")</div>
+                            </AppCard>
+                        </div>
+                    </div>
                 </ChildContent>
-            </MudExpansionPanel>
+            </AppCard>
         }
-    </MudExpansionPanels>
+    </ChildContent>
+</AppPageContainer>
 
 @code {
+    private readonly IReadOnlyList<string> _snapshotComponents = new[] { "AppPageContainer", "AppCard", "AppGrid" };
+
     public class ConsolidadoItem
     {
         public string Empresa { get; set; } = string.Empty;

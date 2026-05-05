@@ -1,10 +1,11 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using Imbalances.Core.Models;
 
 namespace Imbalances.Client.Services;
 
 public class PersistenceState
 {
+    public string FunctionsBaseUrl { get; set; } = string.Empty;
     public List<RegistroContable> Resultados { get; set; } = new();
     public List<HallazgoVerificacion> Hallazgos { get; set; } = new();
     public List<DocumentoVerificado> DocumentosVerificados { get; set; } = new();

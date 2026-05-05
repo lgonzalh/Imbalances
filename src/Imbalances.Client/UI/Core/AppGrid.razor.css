@@ -1,0 +1,99 @@
+.app-grid {
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    background: var(--color-surface);
+}
+
+.app-grid__scroll {
+    overflow-x: auto;
+    overflow-y: auto;
+    max-height: 420px;
+}
+
+.app-grid__scroll::-webkit-scrollbar {
+    height: 8px;
+    width: 8px;
+}
+
+.app-grid__scroll::-webkit-scrollbar-thumb {
+    background: rgba(13, 59, 102, 0.35);
+    border-radius: 999px;
+}
+
+.app-grid__table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    table-layout: fixed;
+    min-width: max-content;
+}
+
+.app-grid__thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--color-secondary);
+    color: var(--color-secondary-contrast);
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    font-size: 0.75rem;
+}
+
+.app-grid__th,
+.app-grid__td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--color-border);
+    min-width: var(--app-grid-mincol, 120px);
+}
+
+.app-grid__th--select,
+.app-grid__td--select {
+    width: 44px;
+    min-width: 44px;
+    max-width: 44px;
+}
+
+.app-grid__tr:nth-child(odd) {
+    background: rgba(245, 247, 250, 0.7);
+}
+
+.app-grid__tr:hover {
+    background: rgba(13, 59, 102, 0.06);
+}
+
+.app-grid__tr--selected {
+    background: rgba(13, 59, 102, 0.10);
+}
+
+.app-grid__cell {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.app-grid__empty {
+    padding: 16px;
+    color: var(--color-secondary-contrast);
+}
+
+.app-grid__th-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.app-grid__resize {
+    width: 10px;
+    cursor: col-resize;
+    height: 20px;
+    flex: 0 0 auto;
+}
+
+.app-grid__chk {
+    width: 16px;
+    height: 16px;
+}
+

@@ -2,6 +2,27 @@ html, body {
     font-family: Tahoma, sans-serif;
 }
 
+    :root {
+        --color-primary: #0d3b66;
+        --color-primary-contrast: #ffffff;
+
+        --color-secondary: #e0e0e0;
+        --color-secondary-contrast: #1a1a1a;
+
+        --color-success: #16a34a;
+        --color-danger: #dc2626;
+
+        --color-bg: #f5f7fa;
+        --color-surface: #ffffff;
+        --color-border: #dae0e6;
+    }
+
+body {
+    background: var(--color-bg);
+    color: var(--color-secondary-contrast);
+}
+
+
 h1:focus {
     outline: none;
 }
@@ -11,9 +32,87 @@ a, .btn-link {
 }
 
 .btn-primary {
-    color: #fff;
-    background-color: #1b6ec2;
-    border-color: #1861ac;
+    color: var(--color-primary-contrast) !important;
+    background-color: var(--color-primary) !important;
+    border-color: var(--color-primary) !important;
+}
+
+.btn-primary:hover {
+    filter: brightness(0.94);
+}
+
+.btn-secondary {
+    color: var(--color-primary) !important;
+    background-color: var(--color-surface) !important;
+    border-color: var(--color-border) !important;
+}
+
+.btn-secondary:hover {
+    background-color: rgba(13, 59, 102, 0.06) !important;
+}
+
+.btn-success {
+    color: #ffffff !important;
+    background-color: var(--color-success) !important;
+    border-color: var(--color-success) !important;
+}
+
+.btn-success:hover {
+    filter: brightness(0.94);
+}
+
+.btn-danger {
+    color: #ffffff !important;
+    background-color: var(--color-danger) !important;
+    border-color: var(--color-danger) !important;
+}
+
+.btn-danger:hover {
+    filter: brightness(0.94);
+}
+
+.app-btn {
+    border-radius: 999px !important;
+    padding: 10px 16px !important;
+    min-height: 44px;
+    font-weight: 700 !important;
+    text-transform: none !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.app-input {
+    width: 100%;
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    padding: 8px 10px;
+    background: var(--color-surface);
+    color: var(--color-secondary-contrast);
+    font-weight: 600;
+}
+
+.app-input:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(13, 59, 102, 0.18);
+    border-color: rgba(13, 59, 102, 0.55);
+}
+
+.app-select {
+    width: 100%;
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    padding: 8px 10px;
+    background: var(--color-surface);
+    color: var(--color-secondary-contrast);
+    font-weight: 700;
+}
+
+.app-select:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(13, 59, 102, 0.18);
+    border-color: rgba(13, 59, 102, 0.55);
 }
 
 .btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {

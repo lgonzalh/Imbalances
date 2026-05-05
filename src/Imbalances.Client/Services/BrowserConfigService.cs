@@ -60,9 +60,9 @@ public class BrowserConfigService : IConfigService
         {
             Empresas =
             {
-                new EmpresaConfig { NombreEmpresa = "AGUILAS DE LA U", NombreCarpeta = "AGUILAS" },
-                new EmpresaConfig { NombreEmpresa = "SASA", NombreCarpeta = "SASA" },
-                new EmpresaConfig { NombreEmpresa = "SAN FRANCISCO FC", NombreCarpeta = "SAN FRANCISCO" }
+                new EmpresaConfig { NombreEmpresa = "AGUILAS DE LA U", NombreCarpeta = "AGUILAS", HojaBalance = "Balance de situación" },
+                new EmpresaConfig { NombreEmpresa = "SASA", NombreCarpeta = "SASA", HojaBalance = "Balance de situación" },
+                new EmpresaConfig { NombreEmpresa = "SAN FRANCISCO FC", NombreCarpeta = "SAN FRANCISCO", HojaBalance = "Balance de situación" }
             },
             Cuentas =
             {

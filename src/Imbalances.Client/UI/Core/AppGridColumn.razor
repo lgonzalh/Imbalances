@@ -1,0 +1,15 @@
+@typeparam TItem
+
+@code {
+    [CascadingParameter] public AppGrid<TItem>? Owner { get; set; }
+    [Parameter] public string Title { get; set; } = string.Empty;
+    [Parameter] public Func<TItem, object?>? ValueSelector { get; set; }
+    [Parameter] public RenderFragment<TItem>? CellTemplate { get; set; }
+    [Parameter] public int? MinWidth { get; set; }
+
+    protected override void OnInitialized()
+    {
+        Owner?.RegisterColumn(this);
+    }
+}
+

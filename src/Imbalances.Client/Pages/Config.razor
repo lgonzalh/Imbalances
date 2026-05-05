@@ -1,129 +1,210 @@
 @page "/config"
 @inject IConfigService ConfigService
+@inject IJSRuntime JS
+@inject Imbalances.Client.Services.UiFeedbackService Ui
+@inject Imbalances.Client.Services.FirebaseMotorsService FirebaseMotors
+@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
 @using Imbalances.Core.Models
+@using Microsoft.JSInterop
 
 <PageTitle>Imbalances - Configuración</PageTitle>
 
-<MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true">
-    <MudTabPanel Text="Empresas">
-        <MudDataGrid T="EmpresaConfig" Items="@_config.Empresas" ReadOnly="false" EditMode="DataGridEditMode.Cell">
-            <Columns>
-                <PropertyColumn Property="x => x.Nombre" Title="Nombre" />
-                <PropertyColumn Property="x => x.CarpetaRegex" Title="Regex Carpeta" />
-                <PropertyColumn Property="x => x.ArchivoRegex" Title="Regex Archivo" />
-                <PropertyColumn Property="x => x.HojaBalance" Title="Nombre Hoja Balance" />
-                <TemplateColumn>
-                    <CellTemplate>
-                        <MudIconButton Icon="@Icons.Material.Filled.Delete" OnClick="@(() => RemoveEmpresa(context.Item))" />
-                    </CellTemplate>
-                </TemplateColumn>
-            </Columns>
-        </MudDataGrid>
-        <MudButton StartIcon="@Icons.Material.Filled.Add" OnClick="AddEmpresa" Class="mt-4" Color="Color.Primary">Agregar Empresa</MudButton>
-    </MudTabPanel>
+<AppPageContainer PageKey="config" Title="CONFIGURACIÓN DEL MOTOR" Components="_snapshotComponents">
+    <Toolbar>
+        <AppToolbar PageKey="config" OnAction="HandleAction" OnFileAction="HandleFileAction" />
+    </Toolbar>
+    <ChildContent>
+        <AppCard Title="GRID 1: EMPRESAS">
+            <AppGrid TItem="EmpresaConfig" Items="@_config.Empresas" Selectable="true" SelectedIndexes="@_empresasSel" SelectedIndexesChanged="@OnEmpresasSelChanged">
+                <Columns>
+                    <AppGridColumn TItem="EmpresaConfig" Title="Nombre carpeta">
+                        <CellTemplate Context="item">
+                            <input class="app-input" value="@item.NombreCarpeta" @oninput="(e) => item.NombreCarpeta = e.Value?.ToString() ?? string.Empty" />
+                        </CellTemplate>
+                    </AppGridColumn>
+                    <AppGridColumn TItem="EmpresaConfig" Title="Nombre empresa">
+                        <CellTemplate Context="item">
+                            <input class="app-input" value="@item.NombreEmpresa" @oninput="(e) => item.NombreEmpresa = e.Value?.ToString() ?? string.Empty" />
+                        </CellTemplate>
+                    </AppGridColumn>
+                </Columns>
+            </AppGrid>
+        </AppCard>
 
-    <MudTabPanel Text="Notas">
-        <MudDataGrid T="NotaConfig" Items="@_config.Notas" ReadOnly="false" EditMode="DataGridEditMode.Cell">
-            <Columns>
-                <PropertyColumn Property="x => x.Nota" Title="Número Nota" />
-                <PropertyColumn Property="x => x.NombreHoja" Title="Nombre Hoja Excel" />
-                <TemplateColumn>
-                    <CellTemplate>
-                        <MudIconButton Icon="@Icons.Material.Filled.Delete" OnClick="@(() => RemoveNota(context.Item))" />
-                    </CellTemplate>
-                </TemplateColumn>
-            </Columns>
-        </MudDataGrid>
-        <MudButton StartIcon="@Icons.Material.Filled.Add" OnClick="AddNota" Class="mt-4" Color="Color.Primary">Agregar Nota</MudButton>
-    </MudTabPanel>
-
-    <MudTabPanel Text="Equivalencias">
-        <MudDataGrid T="CuentaEquivalencia" Items="@_config.Equivalencias" ReadOnly="false" EditMode="DataGridEditMode.Cell">
-            <Columns>
-                <PropertyColumn Property="x => x.CuentaCanonica" Title="Cuenta" />
-                <PropertyColumn Property="x => x.Categoria" Title="Categoría (CxC/CxP)" />
-                <PropertyColumn Property="x => x.Tipo" Title="Tipo (Activo/Pasivo)" />
-                <TemplateColumn Title="Alias (separar por ;)">
-                    <CellTemplate>
-                        @string.Join("; ", context.Item.AliasTexto)
-                    </CellTemplate>
-                    <EditTemplate>
-                        <MudTextField T="string" Value="@string.Join("; ", context.Item.AliasTexto)" 
-                                      ValueChanged="@((s) => UpdateAliases(context.Item, s))" Label="Alias" />
-                    </EditTemplate>
-                </TemplateColumn>
-                <TemplateColumn Title="Notas Permitidas (separar por ;)">
-                    <CellTemplate>
-                        @string.Join("; ", context.Item.NotasPermitidas)
-                    </CellTemplate>
-                    <EditTemplate>
-                        <MudTextField T="string" Value="@string.Join("; ", context.Item.NotasPermitidas)" 
-                                      ValueChanged="@((s) => UpdateNotasPermitidas(context.Item, s))" Label="Notas" />
-                    </EditTemplate>
-                </TemplateColumn>
-                <PropertyColumn Property="x => x.ColumnaValor" Title="Columna Valor (Ej: H)" />
-                <TemplateColumn>
-                    <CellTemplate>
-                        <MudIconButton Icon="@Icons.Material.Filled.Delete" OnClick="@(() => RemoveEquivalencia(context.Item))" />
-                    </CellTemplate>
-                </TemplateColumn>
-            </Columns>
-        </MudDataGrid>
-        <MudButton StartIcon="@Icons.Material.Filled.Add" OnClick="AddEquivalencia" Class="mt-4" Color="Color.Primary">Agregar Equivalencia</MudButton>
-    </MudTabPanel>
-</MudTabs>
-
-<MudPaper Class="pa-4 mt-4 d-flex justify-end" Elevation="0">
-    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Save" StartIcon="@Icons.Material.Filled.Save">Guardar Configuración</MudButton>
-</MudPaper>
+        <AppCard Title="GRID 2: CUENTAS">
+            <AppGrid TItem="CuentaConfig" Items="@_config.Cuentas" Selectable="true" SelectedIndexes="@_cuentasSel" SelectedIndexesChanged="@OnCuentasSelChanged">
+                <Columns>
+                    <AppGridColumn TItem="CuentaConfig" Title="Nombre cuenta">
+                        <CellTemplate Context="item">
+                            <input class="app-input" value="@item.NombreCuenta" @oninput="(e) => item.NombreCuenta = e.Value?.ToString() ?? string.Empty" />
+                        </CellTemplate>
+                    </AppGridColumn>
+                    <AppGridColumn TItem="CuentaConfig" Title="Tipo (CxC|CxP)">
+                        <CellTemplate Context="item">
+                            <select class="app-select" value="@item.Tipo" @onchange="(e) => item.Tipo = e.Value?.ToString() ?? string.Empty">
+                                <option value="CxC">CxC</option>
+                                <option value="CxP">CxP</option>
+                            </select>
+                        </CellTemplate>
+                    </AppGridColumn>
+                    <AppGridColumn TItem="CuentaConfig" Title="Columna valor">
+                        <CellTemplate Context="item">
+                            <input class="app-input" value="@item.ColumnaValor" @oninput="(e) => item.ColumnaValor = e.Value?.ToString() ?? string.Empty" />
+                        </CellTemplate>
+                    </AppGridColumn>
+                    <AppGridColumn TItem="CuentaConfig" Title="Columna nota">
+                        <CellTemplate Context="item">
+                            <input class="app-input" value="@item.ColumnaNota" @oninput="(e) => item.ColumnaNota = e.Value?.ToString() ?? string.Empty" />
+                        </CellTemplate>
+                    </AppGridColumn>
+                </Columns>
+            </AppGrid>
+        </AppCard>
+    </ChildContent>
+</AppPageContainer>
 
 @code {
     private ConfiguracionCore _config = new();
+    private HashSet<int> _empresasSel = new();
+    private HashSet<int> _cuentasSel = new();
+    private readonly IReadOnlyList<string> _snapshotComponents = new[] { "AppPageContainer", "AppCard", "AppGrid", "AppToolbar" };
 
     protected override async Task OnInitializedAsync()
     {
+        try
+        {
+            var functionsBaseUrl = Configuration["Firebase:FunctionsBaseUrl"] ?? string.Empty;
+            if (!string.IsNullOrWhiteSpace(functionsBaseUrl))
+            {
+                var remoteConfig = await FirebaseMotors.ObtenerConfiguracionAsync(functionsBaseUrl);
+                if (remoteConfig != null && 
+                    (remoteConfig.Empresas.Count > 0 || remoteConfig.Cuentas.Count > 0))
+                {
+                    _config = remoteConfig;
+                    await ConfigService.GuardarConfiguracionAsync(_config); // Sync local cache
+                    return;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Ui.ShowWarning($"No se pudo cargar desde Firebase: {ex.Message}. Cargando local.");
+        }
+
         _config = await ConfigService.CargarConfiguracionAsync();
+    }
+
+    private Task OnEmpresasSelChanged(HashSet<int> indexes)
+    {
+        _empresasSel = indexes;
+        return Task.CompletedTask;
+    }
+
+    private Task OnCuentasSelChanged(HashSet<int> indexes)
+    {
+        _cuentasSel = indexes;
+        return Task.CompletedTask;
+    }
+
+    private async Task HandleAction(string id)
+    {
+        switch (id)
+        {
+            case "addEmpresa":
+                AddEmpresa();
+                break;
+            case "addCuenta":
+                AddCuenta();
+                break;
+            case "export":
+                await ExportarConfig();
+                break;
+            case "log":
+                await DescargarLog();
+                break;
+            case "delete":
+                await EliminarSeleccionados();
+                break;
+            case "save":
+                await Save();
+                break;
+        }
+    }
+
+    private async Task HandleFileAction(string id, InputFileChangeEventArgs e)
+    {
+        if (id == "import")
+        {
+            await ImportarConfig(e);
+        }
     }
 
     private async Task Save()
     {
+        var errores = Validar(_config);
+        if (errores.Count > 0)
+        {
+            Ui.ShowWarning($"Validación: se encontraron {errores.Count} error(es).");
+            foreach (var e in errores.Take(10))
+            {
+                Ui.ShowWarning(e);
+            }
+            return;
+        }
+
+        try
+        {
+            var functionsBaseUrl = Configuration["Firebase:FunctionsBaseUrl"] ?? string.Empty;
+            if (!string.IsNullOrWhiteSpace(functionsBaseUrl))
+            {
+                await FirebaseMotors.GuardarConfiguracionAsync(functionsBaseUrl, _config);
+                Ui.ShowSuccess("Configuración sincronizada con Firestore.");
+            }
+            else
+            {
+                Ui.ShowWarning("No hay FunctionsBaseUrl configurada. Solo se guardará localmente.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Ui.ShowError(ex, "Error sincronizando con Firestore.");
+        }
+
         await ConfigService.GuardarConfiguracionAsync(_config);
+        Ui.ShowSuccess("Configuración guardada localmente.");
     }
 
-    private void AddEmpresa()
+    private void AddEmpresa() => _config.Empresas.Add(new EmpresaConfig());
+    private void AddCuenta() => _config.Cuentas.Add(new CuentaConfig());
+    private void AddNota() => _config.Notas.Add(new NotaConfig());
+    private void AddEquivalencia() => _config.Equivalencias.Add(new CuentaEquivalencia());
+
+    private async Task RemoveEmpresa(EmpresaConfig item)
     {
-        _config.Empresas.Add(new EmpresaConfig());
-        StateHasChanged();
-    }
-    
-    private void RemoveEmpresa(EmpresaConfig item)
-    {
+        var ok = await Ui.ConfirmAsync("Eliminar empresa", "¿Desea eliminar esta empresa de la configuración?");
+        if (!ok) return;
         _config.Empresas.Remove(item);
-        StateHasChanged();
     }
 
-    private void AddNota()
+    private async Task RemoveCuenta(CuentaConfig item)
     {
-        _config.Notas.Add(new NotaConfig());
-        StateHasChanged();
+        var ok = await Ui.ConfirmAsync("Eliminar cuenta", "¿Desea eliminar esta cuenta de la configuración?");
+        if (!ok) return;
+        _config.Cuentas.Remove(item);
     }
 
-    private void RemoveNota(NotaConfig item)
+    private async Task RemoveNota(NotaConfig item)
     {
+        var ok = await Ui.ConfirmAsync("Eliminar nota", "¿Desea eliminar esta nota de la configuración?");
+        if (!ok) return;
         _config.Notas.Remove(item);
-        StateHasChanged();
     }
 
-    private void AddEquivalencia()
+    private async Task RemoveEquivalencia(CuentaEquivalencia item)
     {
-        _config.Equivalencias.Add(new CuentaEquivalencia());
-        StateHasChanged();
-    }
-
-    private void RemoveEquivalencia(CuentaEquivalencia item)
-    {
+        var ok = await Ui.ConfirmAsync("Eliminar equivalencia", "¿Desea eliminar esta equivalencia de la configuración?");
+        if (!ok) return;
         _config.Equivalencias.Remove(item);
-        StateHasChanged();
     }
 
     private void UpdateAliases(CuentaEquivalencia item, string value)
@@ -134,5 +215,132 @@
     private void UpdateNotasPermitidas(CuentaEquivalencia item, string value)
     {
         item.NotasPermitidas = (value ?? "").Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+    }
+
+    private async Task ExportarConfig()
+    {
+        await JS.InvokeVoidAsync("excelInterop.descargarConfiguracionMotor", _config, "config_imbalances.xlsx");
+        Ui.ShowSuccess("Descarga iniciada.");
+    }
+
+    private async Task DescargarLog()
+    {
+        var errores = Validar(_config);
+
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine("Imbalances - Log de configuración");
+        sb.AppendLine($"Fecha: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+        sb.AppendLine($"Empresas: {_config.Empresas.Count}");
+        sb.AppendLine($"Cuentas: {_config.Cuentas.Count}");
+        sb.AppendLine();
+
+        if (errores.Count == 0)
+        {
+            sb.AppendLine("Sin errores de validación.");
+        }
+        else
+        {
+            sb.AppendLine("Errores de validación:");
+            foreach (var e in errores)
+            {
+                sb.AppendLine($"- {e}");
+            }
+        }
+
+        await JS.InvokeVoidAsync("imbalancesDownload.downloadTextFile", "log_config_imbalances.txt", sb.ToString(), "text/plain");
+        Ui.ShowSuccess("Log descargado.");
+    }
+
+    private async Task EliminarSeleccionados()
+    {
+        var total = _empresasSel.Count + _cuentasSel.Count;
+        if (total == 0)
+        {
+            Ui.ShowWarning("No hay filas seleccionadas.");
+            return;
+        }
+
+        var ok = await Ui.ConfirmAsync("Eliminar seleccionados", $"¿Desea eliminar {total} elemento(s) seleccionado(s)?");
+        if (!ok) return;
+
+        foreach (var idx in _empresasSel.OrderByDescending(x => x).ToArray())
+        {
+            if (idx >= 0 && idx < _config.Empresas.Count) _config.Empresas.RemoveAt(idx);
+        }
+
+        foreach (var idx in _cuentasSel.OrderByDescending(x => x).ToArray())
+        {
+            if (idx >= 0 && idx < _config.Cuentas.Count) _config.Cuentas.RemoveAt(idx);
+        }
+
+        _empresasSel.Clear();
+        _cuentasSel.Clear();
+    }
+
+    private async Task ImportarConfig(InputFileChangeEventArgs e)
+    {
+        try
+        {
+            if (!e.File.Name.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase))
+            {
+                Ui.ShowError("Archivo inválido: solo se permite .xlsx.");
+                return;
+            }
+
+            await using var stream = e.File.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
+            using var streamRef = new DotNetStreamReference(stream);
+
+            var result = await JS.InvokeAsync<ExcelConfigImportResult>("excelInterop.leerConfiguracionMotor", streamRef);
+            if (!result.Ok || result.Config == null)
+            {
+                var errors = result.Errors ?? new List<string>();
+                Ui.ShowError($"Importación cancelada: se encontraron {errors.Count} error(es).");
+                foreach (var msg in errors.Take(20))
+                {
+                    Ui.ShowError(msg);
+                }
+                return;
+            }
+
+            _config.Empresas = result.Config.Empresas ?? new List<EmpresaConfig>();
+            _config.Cuentas = result.Config.Cuentas ?? new List<CuentaConfig>();
+            _empresasSel.Clear();
+            _cuentasSel.Clear();
+
+            await ConfigService.GuardarConfiguracionAsync(_config);
+            Ui.ShowSuccess("Configuración importada y guardada.");
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Ui.ShowError(ex, "Error al importar.");
+        }
+    }
+
+    private sealed class ExcelConfigImportResult
+    {
+        public bool Ok { get; set; }
+        public List<string> Errors { get; set; } = new();
+        public ConfiguracionCore? Config { get; set; }
+    }
+
+    private static List<string> Validar(ConfiguracionCore config)
+    {
+        var errores = new List<string>();
+
+        foreach (var e in config.Empresas)
+        {
+            if (string.IsNullOrWhiteSpace(e.NombreCarpeta)) errores.Add("Empresa: falta 'Nombre carpeta'.");
+        }
+
+        foreach (var c in config.Cuentas)
+        {
+            if (string.IsNullOrWhiteSpace(c.NombreCuenta)) errores.Add("Cuenta: falta 'Nombre cuenta'.");
+            if (c.Tipo != "CxC" && c.Tipo != "CxP") errores.Add("Cuenta: 'Tipo' inválido (CxC|CxP).");
+            if (string.IsNullOrWhiteSpace(c.ColumnaValor)) errores.Add("Cuenta: falta 'Columna valor'.");
+            if (string.IsNullOrWhiteSpace(c.ColumnaNota)) errores.Add("Cuenta: falta 'Columna nota'.");
+        }
+
+        return errores;
     }
 }
