@@ -43,7 +43,7 @@ public sealed class UiConfigService
     {
         return new UiConfigRoot
         {
-            Layout = new UiLayoutConfig { ToolbarPosition = "bottom", ToolbarSticky = true, ToolbarBottomOffset = 16 },
+            Layout = new UiLayoutConfig { ToolbarPosition = "top", ToolbarSticky = false, ToolbarBottomOffset = 16 },
             Grid = new UiGridConfig { ScrollHorizontal = true, ResizableColumns = true, MinColumnWidth = 120 },
             Card = new UiCardConfig { Collapsible = true, DefaultExpanded = true },
             Toolbar = new UiToolbarConfig { ShowAdd = true, ShowDelete = true, ShowSave = true, ShowImport = true, ShowExport = true, ShowLog = true }

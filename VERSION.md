@@ -1,5 +1,16 @@
 # Imbalances - Registro de Versiones
 
+## v1.1.18 (2026-05-07)
+
+### ✅ Cambios Realizados:
+
+1. **UX/UI Updates**: Explorador sin campos redundantes, LOG compacto dentro del panel, botones homologados (rect 4px), títulos de página eliminados en Config/Análisis/Informe.
+2. **Fix Motor 3**: Eliminada dependencia de `collectionGroup` con índice compuesto; Motor 3 itera jerarquía `empresas/{id}/periodos/{p}/movimientos`. Motor 2 materializa documento padre de empresa.
+3. **Fix OnFilesSelectedJS**: Firma corregida para recibir `(string inputId, List<FileJSData> files)` — botón Iniciar habilitado correctamente.
+4. **Log en Configuración**: Botón Log exporta el mismo log del Explorador (vía `IProgressService`).
+5. **Firestore Rules**: Lectura habilitada para `cruces`, `config_*` colecciones.
+6. **Deploy**: Functions desplegadas a `southamerica-east1`.
+
 ## v1.1.15 (2026-05-05)
 
 ### ✅ Cambios Realizados:

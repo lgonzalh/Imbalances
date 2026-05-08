@@ -2,7 +2,7 @@
 @inject UiConfigService UiConfig
 @inject UiSnapshotService Snapshots
 
-<div class="app-page">
+<div class="@PageClass">
     @if (!string.IsNullOrWhiteSpace(Title) || Toolbar != null)
     {
         <div class="app-page__header">
@@ -43,6 +43,11 @@
     private bool _toolbarSticky = true;
     private int _toolbarBottomOffset = 16;
     private string _toolbarBottomOffsetPx => $"{_toolbarBottomOffset}px";
+    private bool HasTopToolbar => Toolbar != null && string.Equals(_toolbarPosition, "top", StringComparison.OrdinalIgnoreCase);
+    private bool HasBottomToolbar => Toolbar != null && !HasTopToolbar;
+    private string PageClass => HasBottomToolbar && _toolbarSticky
+        ? "app-page app-page--has-sticky-footer"
+        : "app-page";
 
     protected override async Task OnParametersSetAsync()
     {

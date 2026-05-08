@@ -10,6 +10,7 @@ using Imbalances.Client.Services;
 using Imbalances.Client.UI.Core;
 using Imbalances.Core.Models;
 using Imbalances.Core.Services;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using MudBlazor.Services;
 using Xunit;
@@ -81,6 +82,8 @@ public class AnalisisPageTests
         ctx.Services.AddScoped<UiFeedbackService>();
         ctx.Services.AddScoped<ExplorerStateService>();
         ctx.Services.AddScoped(_ => new HttpClient { BaseAddress = new Uri("http://localhost/") });
+        ctx.Services.AddScoped<FirebaseMotorsService>();
+        ctx.Services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
         ctx.Services.AddScoped<UiConfigService>();
         ctx.Services.AddScoped<UiSnapshotService>();
 

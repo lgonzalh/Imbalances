@@ -43,7 +43,7 @@ public class FirebaseMotorsService
         };
 
         var resp = await _http.PostAsJsonAsync(url, payload, cancellationToken);
-        resp.EnsureSuccessStatusCode();
+        await EnsureSuccessAsync(resp, cancellationToken);
         return (await resp.Content.ReadFromJsonAsync<GuardarMovimientosResponse>(cancellationToken: cancellationToken))
                ?? new GuardarMovimientosResponse();
     }
@@ -58,7 +58,7 @@ public class FirebaseMotorsService
         var payload = new CruzarRequest { Periodo = periodo, Tolerancia = tolerancia };
 
         var resp = await _http.PostAsJsonAsync(url, payload, cancellationToken);
-        resp.EnsureSuccessStatusCode();
+        await EnsureSuccessAsync(resp, cancellationToken);
         return (await resp.Content.ReadFromJsonAsync<CruzarResponse>(cancellationToken: cancellationToken))
                ?? new CruzarResponse();
     }
@@ -70,7 +70,7 @@ public class FirebaseMotorsService
     {
         var url = BuildUrl(baseUrl, "guardarConfiguracion");
         var resp = await _http.PostAsJsonAsync(url, configuracion, cancellationToken);
-        resp.EnsureSuccessStatusCode();
+        await EnsureSuccessAsync(resp, cancellationToken);
     }
 
     public async Task<ConfiguracionCore?> ObtenerConfiguracionAsync(
@@ -80,8 +80,19 @@ public class FirebaseMotorsService
         var url = BuildUrl(baseUrl, "obtenerConfiguracion");
         var resp = await _http.GetAsync(url, cancellationToken);
         if (!resp.IsSuccessStatusCode) return null;
-        
+
         return await resp.Content.ReadFromJsonAsync<ConfiguracionCore>(cancellationToken: cancellationToken);
+    }
+
+    private static async Task EnsureSuccessAsync(HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        if (response.IsSuccessStatusCode)
+        {
+            return;
+        }
+
+        var detail = await response.Content.ReadAsStringAsync(cancellationToken);
+        throw new HttpRequestException($"{(int)response.StatusCode} {response.ReasonPhrase}: {detail}");
     }
 
     private static string BuildUrl(string baseUrl, string functionName)

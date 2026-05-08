@@ -4,12 +4,15 @@
 @inject Imbalances.Client.Services.UiFeedbackService Ui
 @inject Imbalances.Client.Services.FirebaseMotorsService FirebaseMotors
 @inject Microsoft.Extensions.Configuration.IConfiguration Configuration
+@inject Imbalances.Core.Services.IProgressService ProgressService
 @using Imbalances.Core.Models
+@using Imbalances.Core.Services
 @using Microsoft.JSInterop
+@using System.Text
 
 <PageTitle>Imbalances - Configuración</PageTitle>
 
-<AppPageContainer PageKey="config" Title="CONFIGURACIÓN DEL MOTOR" Components="_snapshotComponents">
+<AppPageContainer PageKey="config" Title="" Components="_snapshotComponents">
     <Toolbar>
         <AppToolbar PageKey="config" OnAction="HandleAction" OnFileAction="HandleFileAction" />
     </Toolbar>
@@ -77,7 +80,7 @@
             if (!string.IsNullOrWhiteSpace(functionsBaseUrl))
             {
                 var remoteConfig = await FirebaseMotors.ObtenerConfiguracionAsync(functionsBaseUrl);
-                if (remoteConfig != null && 
+                if (remoteConfig != null &&
                     (remoteConfig.Empresas.Count > 0 || remoteConfig.Cuentas.Count > 0))
                 {
                     _config = remoteConfig;
@@ -225,29 +228,30 @@
 
     private async Task DescargarLog()
     {
-        var errores = Validar(_config);
+        var estado = ProgressService.ObtenerEstado();
+        var logs = estado.Logs;
 
-        var sb = new System.Text.StringBuilder();
-        sb.AppendLine("Imbalances - Log de configuración");
-        sb.AppendLine($"Fecha: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-        sb.AppendLine($"Empresas: {_config.Empresas.Count}");
-        sb.AppendLine($"Cuentas: {_config.Cuentas.Count}");
-        sb.AppendLine();
-
-        if (errores.Count == 0)
+        if (!logs.Any())
         {
-            sb.AppendLine("Sin errores de validación.");
-        }
-        else
-        {
-            sb.AppendLine("Errores de validación:");
-            foreach (var e in errores)
-            {
-                sb.AppendLine($"- {e}");
-            }
+            Ui.ShowWarning("No hay log de procesamiento disponible. Ejecuta primero una extracción en el Explorador.");
+            return;
         }
 
-        await JS.InvokeVoidAsync("imbalancesDownload.downloadTextFile", "log_config_imbalances.txt", sb.ToString(), "text/plain");
+        var sb = new StringBuilder();
+        sb.AppendLine("IMBALANCES - LOG DE PROCESAMIENTO");
+        sb.AppendLine($"Generado: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+        sb.AppendLine($"Etapa actual: {estado.EtapaActual}");
+        sb.AppendLine($"Archivos: {estado.CurrentStep}/{estado.TotalSteps}");
+        sb.AppendLine(new string('-', 80));
+
+        foreach (var log in logs)
+        {
+            sb.AppendLine($"[{log.Timestamp:yyyy-MM-dd HH:mm:ss}] [{log.Estado}] {log.Mensaje}");
+        }
+
+        var bytes = System.Text.Encoding.UTF8.GetBytes(sb.ToString());
+        var base64 = Convert.ToBase64String(bytes);
+        await JS.InvokeVoidAsync("eval", $"const a = document.createElement('a'); a.href = 'data:text/plain;base64,{base64}'; a.download = 'imbalances_log_{DateTime.Now:yyyyMMdd_HHmmss}.txt'; a.click();");
         Ui.ShowSuccess("Log descargado.");
     }
 

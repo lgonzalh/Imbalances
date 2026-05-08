@@ -24,13 +24,13 @@
             <div class="panel-header explorer-header-grid">
                 <MudText Typo="Typo.h6" Class="brand-title">EXPLORADOR DE ARCHIVOS</MudText>
                 <div class="filter-container">
-                    <MudTextField @bind-Value="_searchString" 
-                                  Placeholder="Filtro" 
-                                  Adornment="Adornment.End" 
-                                  AdornmentIcon="@Icons.Material.Filled.FilterList" 
+                    <MudTextField @bind-Value="_searchString"
+                                  Placeholder="Filtro"
+                                  Adornment="Adornment.End"
+                                  AdornmentIcon="@Icons.Material.Filled.FilterList"
                                   IconSize="Size.Small"
-                                  Variant="Variant.Outlined" 
-                                  Margin="Margin.Dense" 
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
                                   Class="filter-input"
                                   Immediate="true"
                                   Clearable="true" />
@@ -39,7 +39,7 @@
             <div class="panel-content scrollable">
                 <InputFile id="folderInput" multiple OnChange="OnInputFileChanged" style="display: none;" accept=".xlsx,.xls" webkitdirectory directory />
                 <InputFile id="filesInput" multiple OnChange="OnInputFileChanged" style="display: none;" accept=".xlsx,.xls" />
-                
+
                 @if (!TreeItems.Any())
                 {
                     <div class="d-flex flex-column align-center justify-center h-100 pa-10">
@@ -127,88 +127,20 @@
                     }
                 }
             </div>
-            <div class="panel-footer">
-                <div class="d-flex gap-4 align-center mb-2">
-                    <MudTextField @bind-Value="_functionsBaseUrl" Placeholder="FunctionsBaseUrl" Variant="Variant.Outlined" Margin="Margin.Dense" Class="footer-btn" />
-                    <MudTextField @bind-Value="_periodo" Placeholder="Periodo (YYYY-MM)" Variant="Variant.Outlined" Margin="Margin.Dense" Class="footer-btn" />
-                    <MudNumericField T="decimal" @bind-Value="_tolerancia" Placeholder="Tolerancia" Variant="Variant.Outlined" Margin="Margin.Dense" Class="footer-btn" />
+            @if (procesando)
+            {
+                <div class="panel-section">
+                    <div class="panel-section-header">PROCESANDO ARCHIVOS</div>
+                    <div class="panel-section-body">
+                        <MudProgressLinear Color="Color.Primary" Size="Size.Large" Striped="true" Value="@GetProgressValue()" Min="0" Max="100" />
+                        <MudText Typo="Typo.body2" Class="mt-2" Style="color: #002C54;">@GetProgressText()</MudText>
+                    </div>
                 </div>
-                <MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="Cancelar" Class="footer-btn">Limpiar Todo</MudButton>
-                @if (logsProcesamiento.Any())
-                {
-                    <MudButton Variant="Variant.Outlined" Color="Color.Info" OnClick="ExportarLog" StartIcon="@Icons.Material.Filled.Description" Class="footer-btn mx-2">
-                        Exportar Log
-                    </MudButton>
-                }
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ProcesarSeleccion" Disabled="@(!GetSelectedFiles().Any())" Class="footer-btn confirm-btn px-8">
-                    Iniciar
-                </MudButton>
-            </div>
-        </div>
-    </div>
-
-    @if (procesando)
-{
-    <MudItem xs="12" Class="mt-4">
-        <MudCard Elevation="1" Style="border: 1px solid #DAE0E6;">
-            <MudCardHeader Style="background-color: #F8F9FA; border-bottom: 1px solid #DAE0E6;">
-                <CardHeaderContent>
-                    <MudText Typo="Typo.h6" Style="color: #002C54; font-weight: 700;">PROCESANDO ARCHIVOS</MudText>
-                </CardHeaderContent>
-            </MudCardHeader>
-            <MudCardContent Class="pa-4">
-                <MudProgressLinear Color="Color.Primary" Size="Size.Large" Striped="true" Value="@GetProgressValue()" Min="0" Max="100" />
-                <MudText Typo="Typo.body2" Class="mt-2" Style="color: #002C54;">
-                    @GetProgressText()
-                </MudText>
-            </MudCardContent>
-        </MudCard>
-    </MudItem>
-}
-
-    @if (ExplorerState.Resultados.Any() || logsProcesamiento.Any())
-    {
-        <MudItem xs="12" Class="mt-6">
-            <MudCard Elevation="1" Style="border: 1px solid #DAE0E6;">
-                <MudCardHeader Style="background-color: #F8F9FA; border-bottom: 1px solid #DAE0E6;">
-                    <CardHeaderContent>
-                        <MudText Typo="Typo.h6" Style="color: #002C54; font-weight: 700;">CONSOLIDADO DE EXTRACCIÓN</MudText>
-                    </CardHeaderContent>
-                    <CardHeaderActions>
-                        <MudButton Color="Color.Primary" Variant="Variant.Text">Descargar</MudButton>
-                    </CardHeaderActions>
-                </MudCardHeader>
-                <MudCardContent Class="pa-0">
-                    <MudDataGrid Items="@ExplorerState.Resultados" Dense="true" Hover="true" Striped="true" FixedHeader="true" Height="450px" Class="results-grid">
-                        <Columns>
-                            <PropertyColumn Property="x => x.Empresa" Title="Empresa" />
-                            <PropertyColumn Property="x => x.EmpresaContraparte" Title="Contraparte" />
-                            <PropertyColumn Property="x => x.Cuenta" Title="Cuenta Contable" />
-                            <PropertyColumn Property="x => x.Categoria" Title="Categoría" />
-                            <PropertyColumn Property="x => x.Tipo" Title="Naturaleza" />
-                            <PropertyColumn Property="x => x.Nota" Title="Nota Ref." />
-                            <PropertyColumn Property="x => x.Valor" Title="Saldo Local" Format="N2">
-                                <CellTemplate>
-                                    <MudText Style="font-weight: 600; color: #002C54;">@context.Item.Valor.ToString("N2")</MudText>
-                                </CellTemplate>
-                            </PropertyColumn>
-                        </Columns>
-                    </MudDataGrid>
-                </MudCardContent>
-            </MudCard>
-        </MudItem>
-    }
-
-    @if (logsProcesamiento.Any())
-    {
-        <MudItem xs="12" Class="mt-6">
-            <MudCard Elevation="1" Style="border: 1px solid #DAE0E6;">
-                <MudCardHeader Style="background-color: #F8F9FA; border-bottom: 1px solid #DAE0E6;">
-                     <CardHeaderContent>
-                         <MudText Typo="Typo.h6" Style="color: #002C54; font-weight: 700;">LOG DE PROCESAMIENTO</MudText>
-                     </CardHeaderContent>
-                 </MudCardHeader>
-                <MudCardContent Class="pa-0">
+            }
+            @if (logsProcesamiento.Any())
+            {
+                <div class="panel-section">
+                    <div class="panel-section-header">LOG</div>
                     <div class="log-container">
                         @foreach (var log in logsProcesamiento)
                         {
@@ -219,10 +151,16 @@
                             </div>
                         }
                     </div>
-                </MudCardContent>
-            </MudCard>
-        </MudItem>
-    }
+                </div>
+            }
+            <div class="panel-footer">
+                <MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="Cancelar" Class="footer-btn">Limpiar</MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ProcesarSeleccion" Disabled="@(!GetSelectedFiles().Any())" Class="footer-btn confirm-btn px-8">
+                    Iniciar
+                </MudButton>
+            </div>
+        </div>
+    </div>
 </div>
 
 <style>
@@ -430,16 +368,34 @@
         border: none !important;
     }
 
+    .panel-section {
+        border-top: 1px solid #DAE0E6;
+        flex-shrink: 0;
+    }
+
+    .panel-section-header {
+        padding: 8px 20px;
+        background-color: #F8F9FA;
+        color: #002C54;
+        font-weight: 700;
+        font-size: 0.8rem;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+    }
+
+    .panel-section-body {
+        padding: 12px 20px;
+    }
+
     .log-container {
-        background-color: #1e1e1e;
-        color: #d4d4d4;
+        background-color: #ffffff;
+        color: #adb5bd;
         font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
         font-size: 0.8rem;
         line-height: 1.4;
-        padding: 16px;
-        max-height: 400px;
+        padding: 12px 16px;
+        height: 180px;
         overflow-y: auto;
-        border-radius: 4px;
     }
 
     .log-entry {
@@ -448,7 +404,7 @@
     }
 
     .log-timestamp {
-        color: #858585;
+        color: #ced4da;
         margin-right: 8px;
     }
 
@@ -529,7 +485,7 @@
     }
 
     [JSInvokable]
-    public void OnFilesSelectedJS(List<FileJSData> files)
+    public void OnFilesSelectedJS(string inputId, List<FileJSData> files)
     {
         _pendingJsFiles = files;
         TryRebuildTree();
@@ -679,7 +635,7 @@
             SetAllVisible(TreeItems, true);
             return TreeItems;
         }
-        
+
         ApplyFilter(TreeItems, _searchString);
         return TreeItems;
     }
@@ -700,12 +656,12 @@
         {
             bool matches = item.Name.Contains(filter, StringComparison.OrdinalIgnoreCase) || parentMatched;
             bool childrenVisible = ApplyFilter(item.Children, filter, matches);
-            
+
             item.Visible = matches || childrenVisible;
             if (item.Visible)
             {
                 anyVisible = true;
-                if (childrenVisible && !string.IsNullOrEmpty(filter) && !parentMatched) 
+                if (childrenVisible && !string.IsNullOrEmpty(filter) && !parentMatched)
                     item.IsExpanded = true;
             }
         }
@@ -786,21 +742,21 @@
         _previewResultados.Clear();
         ExplorerState.Hallazgos.Clear();
         ExplorerState.ArchivosSeleccionados = selectedFiles.Select(f => f.Path).ToList();
-        
+
         logsProcesamiento.Clear();
         procesando = true;
-        
+
         // Forzar actualización inmediata de la UI para mostrar barra de progreso
-        await Task.Delay(1); 
+        await Task.Delay(1);
         StateHasChanged();
-        
+
         // Suscribirse a los cambios del ProgressService
         ProgressService.OnChange += ActualizarLogs;
-        
+
         ProgressService.Inicializar(filesToProcess.Count);
         ProgressService.Log("INICIO: Iniciando procesamiento de archivos seleccionados", "Info");
-        
-        try 
+
+        try
         {
             var config = await ConfigService.CargarConfiguracionAsync();
 
@@ -810,7 +766,7 @@
             {
                 var file = fileItem.BrowserFile!;
                 ProgressService.Log($"Iniciando extracción de: {file.Name}", "Info");
-                
+
                 try
                 {
                     using var stream = file.OpenReadStream(maxAllowedSize: 100 * 1024 * 1024);
@@ -822,7 +778,7 @@
 
                     registrosCrudos.AddRange(res);
                     _previewResultados.AddRange(res);
-                    
+
                     ProgressService.Log($"FIN: Extracción exitosa para {file.Name}", "Success");
                     ProgressService.Avanzar($"Completado: {file.Name}");
                 }
@@ -913,7 +869,7 @@
             }
 
             ProgressService.Log("FIN GLOBAL: Proceso finalizado correctamente.", "Success");
-            
+
             // Persistir el estado para que se mantenga al navegar
             await StatePersistence.GuardarEstadoAsync(new Imbalances.Client.Services.PersistenceState
             {
@@ -960,7 +916,7 @@
 
         var estado = ProgressService.ObtenerEstado();
         var fechaGeneracion = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-        
+
         var contenido = new StringBuilder();
         contenido.AppendLine("IMBALANCES - LOG DE PROCESAMIENTO");
         contenido.AppendLine($"Generado: {fechaGeneracion}");

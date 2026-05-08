@@ -1,7 +1,7 @@
 {
   "layout": {
-    "toolbarPosition": "bottom",
-    "toolbarSticky": true,
+    "toolbarPosition": "top",
+    "toolbarSticky": false,
     "toolbarBottomOffset": 16
   },
   "grid": {
@@ -45,4 +45,3 @@
     }
   }
 }
-

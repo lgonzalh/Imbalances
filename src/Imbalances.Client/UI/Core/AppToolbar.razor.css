@@ -4,8 +4,10 @@
     gap: 14px;
     padding: 12px 14px;
     border: 1px solid var(--color-border);
-    border-radius: 16px;
+    border-radius: 8px;
     background: var(--color-surface);
+    width: fit-content;
+    max-width: 100%;
 }
 
 .app-toolbar__label {
@@ -41,6 +43,29 @@
 }
 
 .app-btn--disabled {
-    opacity: 0.55;
+    opacity: 0.38;
     pointer-events: none;
+    cursor: default;
+}
+
+@media (max-width: 720px) {
+    .app-toolbar {
+        align-items: stretch;
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .app-toolbar__divider {
+        width: 100%;
+        height: 1px;
+    }
+
+    .app-toolbar__buttons {
+        justify-content: stretch;
+    }
+
+    .app-toolbar__buttons ::deep .app-btn,
+    .app-toolbar__buttons .app-btn {
+        flex: 1 1 160px;
+    }
 }
