@@ -1,11 +1,20 @@
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
+using System.Text.Json;
 using Imbalances.Client;
 using Imbalances.Client.Services;
 using Imbalances.Client.UI.Core;
 using Imbalances.Core.Services;
 using MudBlazor.Services;
 using Imbalances.Infrastructure;
+
+// Configure global JSON serialization options for Blazor JSInterop
+var jsonOptions = new JsonSerializerOptions
+{
+    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+    DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
+    WriteIndented = false
+};
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");

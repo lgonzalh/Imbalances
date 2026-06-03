@@ -69,7 +69,9 @@ export const guardarConfiguracion = onRequest(
       }
 
       if (body.notas && Array.isArray(body.notas)) {
-        await syncCollection(db, "config_notas", body.notas, (n) => generateSlug(n.identificador));
+        // FIX: NotaConfig has 'nota' and 'nombreHoja', not 'identificador'
+        // Generate ID from 'nota' field instead
+        await syncCollection(db, "config_notas", body.notas, (n) => generateSlug(n.nota || "nota"));
       }
 
       if (body.equivalencias && Array.isArray(body.equivalencias)) {

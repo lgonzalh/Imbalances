@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Json;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
@@ -13,6 +14,12 @@ namespace Imbalances.Client.Services;
 public class FirebaseMotorsService
 {
     private readonly HttpClient _http;
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        WriteIndented = false,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+    };
 
     public FirebaseMotorsService(HttpClient http)
     {
@@ -69,7 +76,7 @@ public class FirebaseMotorsService
         CancellationToken cancellationToken = default)
     {
         var url = BuildUrl(baseUrl, "guardarConfiguracion");
-        var resp = await _http.PostAsJsonAsync(url, configuracion, cancellationToken);
+        var resp = await _http.PostAsJsonAsync(url, configuracion, JsonOptions, cancellationToken);
         await EnsureSuccessAsync(resp, cancellationToken);
     }
 
@@ -81,7 +88,7 @@ public class FirebaseMotorsService
         var resp = await _http.GetAsync(url, cancellationToken);
         if (!resp.IsSuccessStatusCode) return null;
 
-        return await resp.Content.ReadFromJsonAsync<ConfiguracionCore>(cancellationToken: cancellationToken);
+        return await resp.Content.ReadFromJsonAsync<ConfiguracionCore>(JsonOptions, cancellationToken);
     }
 
     private static async Task EnsureSuccessAsync(HttpResponseMessage response, CancellationToken cancellationToken)

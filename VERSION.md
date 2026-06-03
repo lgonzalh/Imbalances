@@ -1,5 +1,69 @@
 # Imbalances - Registro de Versiones
 
+## v1.1.24 (2026-06-03)
+
+### 🔧 DEBUGGING Cloud Functions - Paso 4: Fix acceso a propiedades incorrecto en guardarConfiguracion
+
+**BUG CRÍTICO ENCONTRADO**: En `functions/src/configuracion/guardarConfiguracion.ts` línea 72, el código accedía a `n.identificador` pero el modelo NotaConfig tiene `nota` y `nombreHoja`.
+
+**Solución Paso 4**:
+- Corregido acceso a `n.nota` en lugar de `n.identificador`
+- Agregado fallback a "nota" en caso de undefined
+
+**Archivos Modificados**:
+- `functions/src/configuracion/guardarConfiguracion.ts` (línea 72)
+
+**Verificación**: Guardar notas debe funcionar sin errores silenciosos en Firebase.
+
+## v1.1.23 (2026-06-03)
+
+### 🔧 DEBUGGING Deserialization - Paso 3: JsonSerializerContext Global para Blazor JSInterop
+
+**Problema**: Incluso con [JsonPropertyName], el JSInterop de Blazor también necesita opciones de serialización.
+
+**Solución Paso 3**:
+- Creado `AppJsonSerializerContext` con `@JsonSourceGenerationOptions` para configurar PropertyNamingPolicy = CamelCase
+- Configurado en Program.cs para uso global
+- Asegura que TODAS las deserializaciones (Firebase HTTP + localStorage/IndexedDB) usen las mismas opciones
+
+**Archivos**:
+- `src/Imbalances.Client/JsonSerializerContext.cs` (nuevo)
+- `src/Imbalances.Client/Program.cs` (actualizado)
+
+**Verificación**: Las empresas deben renderizar correctamente tanto al cargar de Firebase como de localStorage.
+
+## v1.1.22 (2026-06-03)
+
+### 🔧 DEBUGGING Deserialization - Paso 2: JsonSerializerOptions en GuardarConfiguracionAsync
+
+**Problema**: Cuando se guardan cambios, el `PostAsJsonAsync` tampoco usa las opciones de serialización.
+
+**Solución Paso 2**: 
+- `GuardarConfiguracionAsync` ahora también usa `JsonSerializerOptions` con CamelCase
+- Asegura que la serialización de envío sea consistente con lo que Firebase Cloud Function espera
+
+**Verificación**: Guardar cambios y verificar en Firestore que se actualicen correctamente.
+
+## v1.1.21 (2026-06-03)
+
+### 🔧 DEBUGGING Deserialization - Paso 1: JsonSerializerOptions Global
+
+**Problema**: Las empresas no se renderizan tras desproteger porque `ReadFromJsonAsync` no tiene opciones de naming policy.
+
+**Solución Paso 1**: Agregar JsonSerializerOptions con CamelCase naming policy en FirebaseMotorsService
+
+**Cambios**:
+- FirebaseMotorsService ahora usa `JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }` en `ObtenerConfiguracionAsync`
+- Esto asegura que el JSON camelCase de Firestore se deserialice correctamente a propiedades PascalCase de C#
+
+**Verificación**: Si las empresas aparecen, entonces este era el problema.
+
+## v1.1.20 (2026-06-03)
+
+### ✅ Cambios Realizados:
+
+1. **JsonPropertyName en modelos**: Agregados atributos `[JsonPropertyName]` explícitos en EmpresaConfig, CuentaConfig, NotaConfig, CuentaEquivalencia y ConfiguracionCore.
+
 ## v1.1.18 (2026-05-07)
 
 ### ✅ Cambios Realizados:
