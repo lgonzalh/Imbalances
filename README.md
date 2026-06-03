@@ -1,6 +1,7 @@
 # Imbalances
 
-<img width="1010" height="1029" alt="Imbalances Dashboard" src="https://lantonium.web.app/assets/img/imbalances/fotograma-00087.jpg" />
+<img width="1920" height="1080" alt="fotograma-00399" src="https://github.com/user-attachments/assets/2e1a7399-0eaa-48ff-b7e9-de2edeafd472" />
+
 
 ## English
 
