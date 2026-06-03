@@ -1,0 +1,56 @@
+@using Imbalances.Client.UI.Core
+@inject UiConfigService UiConfig
+
+<div class="app-card">
+    @if (!string.IsNullOrWhiteSpace(Title) || HeaderActions != null)
+    {
+        <div class="app-card__header">
+            @if (CollapsibleEffective)
+            {
+                <button type="button" class="app-card__toggle" @onclick="Toggle">
+                    <span class="app-card__title">@Title</span>
+                    <span class="app-card__chev">@(_expanded ? "▾" : "▸")</span>
+                </button>
+            }
+            else
+            {
+                <div class="app-card__title">@Title</div>
+            }
+
+            @if (HeaderActions != null)
+            {
+                <div class="app-card__actions">@HeaderActions</div>
+            }
+        </div>
+    }
+    @if (!CollapsibleEffective || _expanded)
+    {
+        <div class="app-card__body">
+            @ChildContent
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public string Title { get; set; } = string.Empty;
+    [Parameter] public RenderFragment? HeaderActions { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public bool? Collapsible { get; set; }
+    [Parameter] public bool? DefaultExpanded { get; set; }
+
+    private bool _expanded;
+    private bool CollapsibleEffective;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var cfg = await UiConfig.GetAsync();
+        CollapsibleEffective = Collapsible ?? cfg.Card.Collapsible;
+        _expanded = DefaultExpanded ?? cfg.Card.DefaultExpanded;
+    }
+
+    private void Toggle()
+    {
+        _expanded = !_expanded;
+    }
+}
+

@@ -1,0 +1,162 @@
+@page "/informe"
+@using Imbalances.Client.Services
+@using Imbalances.Core.Models
+@inject ExplorerStateService ExplorerState
+@inject IStatePersistenceService StatePersistence
+@inject IConfigService ConfigService
+
+<PageTitle>Informe - Imbalances</PageTitle>
+
+<AppPageContainer PageKey="informe" Title="" Components="_snapshotComponents">
+    <ChildContent>
+        @if (!ExplorerState.Resultados.Any())
+        {
+            <MudAlert Severity="Severity.Info">No hay datos procesados. Se muestran las empresas configuradas con totales en 0.</MudAlert>
+        }
+
+        @foreach (var item in Consolidado)
+        {
+            <AppCard Title="@item.Empresa">
+                <HeaderActions>
+                    <div class="report-header-metrics">
+                        <div class="report-metric report-metric--success">Activos: @item.TotalCxC.ToString("N2")</div>
+                        <div class="report-metric report-metric--danger">Pasivos: @item.TotalCxP.ToString("N2")</div>
+                        <div class="report-metric report-metric--diff">Dif: @item.Diferencia.ToString("N2")</div>
+                    </div>
+                </HeaderActions>
+                <ChildContent>
+                    <div class="report-detail-grid">
+                        <div class="report-col">
+                            <AppCard Title="Detalle de Activos (CxC)" Collapsible="false">
+                                <AppGrid TItem="RegistroContable" Items="@item.DetallesCxC" Selectable="false">
+                                    <Columns>
+                                        <AppGridColumn TItem="RegistroContable" Title="Rubro Activo" ValueSelector="x => x.Cuenta" />
+                                        <AppGridColumn TItem="RegistroContable" Title="Nota" ValueSelector="x => x.Nota" />
+                                        <AppGridColumn TItem="RegistroContable" Title="Valor" ValueSelector="x => x.Valor" />
+                                    </Columns>
+                                </AppGrid>
+                                <div class="report-subtotal report-subtotal--success">Subtotal CxC: @item.TotalCxC.ToString("N2")</div>
+                            </AppCard>
+                        </div>
+
+                        <div class="report-col">
+                            <AppCard Title="Detalle de Pasivos (CxP)" Collapsible="false">
+                                <AppGrid TItem="RegistroContable" Items="@item.DetallesCxP" Selectable="false">
+                                    <Columns>
+                                        <AppGridColumn TItem="RegistroContable" Title="Rubro Pasivo" ValueSelector="x => x.Cuenta" />
+                                        <AppGridColumn TItem="RegistroContable" Title="Nota" ValueSelector="x => x.Nota" />
+                                        <AppGridColumn TItem="RegistroContable" Title="Valor" ValueSelector="x => x.Valor" />
+                                    </Columns>
+                                </AppGrid>
+                                <div class="report-subtotal report-subtotal--danger">Subtotal CxP: @item.TotalCxP.ToString("N2")</div>
+                            </AppCard>
+                        </div>
+                    </div>
+                </ChildContent>
+            </AppCard>
+        }
+    </ChildContent>
+</AppPageContainer>
+
+@code {
+    private readonly IReadOnlyList<string> _snapshotComponents = new[] { "AppPageContainer", "AppCard", "AppGrid" };
+
+    public class ConsolidadoItem
+    {
+        public string Empresa { get; set; } = string.Empty;
+        public decimal TotalCxC { get; set; }
+        public decimal TotalCxP { get; set; }
+        public decimal Diferencia { get; set; }
+        public List<RegistroContable> DetallesCxC { get; set; } = new();
+        public List<RegistroContable> DetallesCxP { get; set; } = new();
+    }
+
+    private List<ConsolidadoItem> Consolidado = new();
+    private int _lastResultadosCount = -1;
+    private ConfiguracionCore _config = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _config = await ConfigService.CargarConfiguracionAsync();
+
+        if (!ExplorerState.Resultados.Any())
+        {
+            var savedState = await StatePersistence.CargarEstadoAsync();
+            if (savedState != null && savedState.Resultados.Any())
+            {
+                ExplorerState.Resultados = savedState.Resultados;
+                ExplorerState.ArchivosProcesados = savedState.ArchivosProcesados;
+            }
+        }
+
+        GenerarConsolidado();
+
+        if (!ExplorerState.Resultados.Any())
+        {
+            var savedState = await StatePersistence.CargarEstadoAsync();
+            if (savedState != null && savedState.Resultados.Any())
+            {
+                ExplorerState.Resultados = savedState.Resultados;
+                ExplorerState.ArchivosProcesados = savedState.ArchivosProcesados;
+                GenerarConsolidado();
+            }
+        }
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (ExplorerState.Resultados.Count != _lastResultadosCount)
+        {
+            _lastResultadosCount = ExplorerState.Resultados.Count;
+            GenerarConsolidado();
+            _ = InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void GenerarConsolidado()
+    {
+        var resultados = ExplorerState.Resultados;
+
+        var empresasConfiguradas = _config.Empresas
+            .Where(e => !string.IsNullOrWhiteSpace(e.NombreCarpeta))
+            .Select(e => string.IsNullOrWhiteSpace(e.NombreEmpresa) ? e.NombreCarpeta.Trim() : e.NombreEmpresa.Trim())
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(x => x)
+            .ToList();
+
+        if (resultados == null || !resultados.Any())
+        {
+            Consolidado = empresasConfiguradas.Count > 0
+                ? empresasConfiguradas
+                    .Select(nombre => new ConsolidadoItem { Empresa = nombre, TotalCxC = 0, TotalCxP = 0, Diferencia = 0 })
+                    .ToList()
+                : new List<ConsolidadoItem> { new ConsolidadoItem { Empresa = "Sin configuración", TotalCxC = 0, TotalCxP = 0, Diferencia = 0 } };
+            return;
+        }
+
+        var agrupado = resultados
+            .GroupBy(r => string.IsNullOrWhiteSpace(r.Empresa) ? "Sin empresa" : r.Empresa)
+            .ToDictionary(g => g.Key, g => new ConsolidadoItem
+            {
+                Empresa = g.Key,
+                TotalCxC = g.Where(x => x.Categoria == "CxC").Sum(x => x.Valor),
+                TotalCxP = g.Where(x => x.Categoria == "CxP").Sum(x => x.Valor),
+                Diferencia = g.Where(x => x.Categoria == "CxC").Sum(x => x.Valor) - g.Where(x => x.Categoria == "CxP").Sum(x => x.Valor),
+                DetallesCxC = g.Where(x => x.Categoria == "CxC").OrderBy(x => x.Cuenta).ToList(),
+                DetallesCxP = g.Where(x => x.Categoria == "CxP").OrderBy(x => x.Cuenta).ToList()
+            }, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var empresa in empresasConfiguradas)
+        {
+            if (!agrupado.ContainsKey(empresa))
+            {
+                agrupado[empresa] = new ConsolidadoItem { Empresa = empresa, TotalCxC = 0, TotalCxP = 0, Diferencia = 0 };
+            }
+        }
+
+        Consolidado = agrupado.Values
+            .OrderBy(x => x.Empresa)
+            .ToList();
+    }
+}

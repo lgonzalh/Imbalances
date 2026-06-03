@@ -1,0 +1,317 @@
+@page "/analisis"
+@using Imbalances.Client.Services
+@using Imbalances.Core.Models
+@inject ExplorerStateService ExplorerState
+@inject IStatePersistenceService StatePersistence
+@inject IConfigService ConfigService
+@inject IAuditoriaService AuditoriaService
+@inject IJSRuntime JSRuntime
+@inject UiFeedbackService Ui
+@using Imbalances.Client.Models
+
+<PageTitle>Analisis - Imbalances</PageTitle>
+
+<AppPageContainer PageKey="analisis" Title="" Components="_snapshotComponents">
+    <Toolbar>
+        <AppToolbar PageKey="analisis" OnAction="HandleToolbar" IsEnabled="IsToolbarEnabled" />
+    </Toolbar>
+
+    <ChildContent>
+        @if (!string.IsNullOrWhiteSpace(_initError))
+        {
+            <MudAlert Severity="Severity.Error" Variant="Variant.Filled">
+                @_initError
+            </MudAlert>
+        }
+
+        @if (!TieneDatos)
+        {
+            <MudAlert Severity="Severity.Info">No hay datos procesados. Inicie la extraccion en el Explorador primero.</MudAlert>
+        }
+        else
+        {
+            @if (!_hayResultados && _empresasConfiguradas > 0)
+            {
+                <MudAlert Severity="Severity.Info">Aún no hay extracción. Se muestra el análisis base con la configuración actual.</MudAlert>
+            }
+
+            <div class="analysis-metrics">
+                <AppCard Title="Registros" Collapsible="false">
+                    <div class="analysis-metric-value">@ExplorerState.Resultados.Count</div>
+                </AppCard>
+                <AppCard Title="Hallazgos" Collapsible="false">
+                    <div class="analysis-metric-value analysis-metric-value--danger">@ExplorerState.Hallazgos.Count</div>
+                </AppCard>
+                <AppCard Title="Reportes faltantes" Collapsible="false">
+                    <div class="analysis-metric-value">@DocumentosFaltantes</div>
+                </AppCard>
+                <AppCard Title="Diferencia absoluta" Collapsible="false">
+                    <div class="analysis-metric-value">@DiferenciaAbsoluta.ToString("N2")</div>
+                </AppCard>
+            </div>
+
+            <AppCard Title="DISPONIBILIDAD DOCUMENTAL">
+                <AppGrid TItem="DocumentoVerificado" Items="@ExplorerState.DocumentosVerificados" Selectable="false">
+                    <Columns>
+                        <AppGridColumn TItem="DocumentoVerificado" Title="Empresa" ValueSelector="x => x.Empresa" />
+                        <AppGridColumn TItem="DocumentoVerificado" Title="Reporte" ValueSelector="x => x.Reporte" />
+                        <AppGridColumn TItem="DocumentoVerificado" Title="Estado">
+                            <CellTemplate Context="item">
+                                <MudChip T="string" Color="@(item.Presente ? Color.Success : Color.Error)" Variant="Variant.Outlined" Size="Size.Small">@(item.Presente ? "Presente" : "Faltante")</MudChip>
+                            </CellTemplate>
+                        </AppGridColumn>
+                        <AppGridColumn TItem="DocumentoVerificado" Title="Archivo" ValueSelector="x => x.ArchivoEncontrado" />
+                        <AppGridColumn TItem="DocumentoVerificado" Title="Patron" ValueSelector="x => x.ArchivoRegex" />
+                    </Columns>
+                </AppGrid>
+            </AppCard>
+
+            <AppCard Title="AUDITORIA DE RECIPROCIDAD">
+                <AppGrid TItem="ReciprocidadResultado" Items="@ExplorerState.Reciprocidades" Selectable="false">
+                    <Columns>
+                        <AppGridColumn TItem="ReciprocidadResultado" Title="Entidad CxC" ValueSelector="x => x.EmpresaCxc" />
+                        <AppGridColumn TItem="ReciprocidadResultado" Title="Entidad CxP" ValueSelector="x => x.EmpresaCxp" />
+                        <AppGridColumn TItem="ReciprocidadResultado" Title="Grupo" ValueSelector="x => x.GrupoReciprocidad" />
+                        <AppGridColumn TItem="ReciprocidadResultado" Title="CxC" ValueSelector="x => x.ValorCxc" />
+                        <AppGridColumn TItem="ReciprocidadResultado" Title="CxP" ValueSelector="x => x.ValorCxp" />
+                        <AppGridColumn TItem="ReciprocidadResultado" Title="Diferencia" ValueSelector="x => x.Diferencia" />
+                        <AppGridColumn TItem="ReciprocidadResultado" Title="Control">
+                            <CellTemplate Context="item">
+                                <MudChip T="string" Color="@(item.DentroTolerancia ? Color.Success : Color.Warning)" Variant="Variant.Outlined" Size="Size.Small">@(item.DentroTolerancia ? "OK" : "Revisar")</MudChip>
+                            </CellTemplate>
+                        </AppGridColumn>
+                    </Columns>
+                </AppGrid>
+            </AppCard>
+
+            <AppCard Title="PANEL DE DISCONFORMIDADES">
+                <AppGrid TItem="HallazgoVerificacion" Items="@ExplorerState.Hallazgos" Selectable="false">
+                    <Columns>
+                        <AppGridColumn TItem="HallazgoVerificacion" Title="Tipo" ValueSelector="x => x.Tipo" />
+                        <AppGridColumn TItem="HallazgoVerificacion" Title="Severidad" ValueSelector="x => x.Severidad" />
+                        <AppGridColumn TItem="HallazgoVerificacion" Title="Empresa" ValueSelector="x => x.Empresa" />
+                        <AppGridColumn TItem="HallazgoVerificacion" Title="Contraparte" ValueSelector="x => x.Contraparte" />
+                        <AppGridColumn TItem="HallazgoVerificacion" Title="Cuenta/Grupo" ValueSelector="x => x.Cuenta" />
+                        <AppGridColumn TItem="HallazgoVerificacion" Title="Reporte" ValueSelector="x => x.Reporte" />
+                        <AppGridColumn TItem="HallazgoVerificacion" Title="Diferencia" ValueSelector="x => x.Diferencia" />
+                        <AppGridColumn TItem="HallazgoVerificacion" Title="Estado">
+                            <CellTemplate Context="item">
+                                <MudSelect T="string" Value="@item.Estado" ValueChanged="@((value) => CambiarEstadoHallazgo(item, value))" Margin="Margin.Dense" Variant="Variant.Outlined" Dense="true">
+                                    <MudSelectItem Value="@("Pendiente")">Pendiente</MudSelectItem>
+                                    <MudSelectItem Value="@("Revisado")">Revisado</MudSelectItem>
+                                    <MudSelectItem Value="@("Corregido")">Corregido</MudSelectItem>
+                                    <MudSelectItem Value="@("Descartado")">Descartado</MudSelectItem>
+                                </MudSelect>
+                            </CellTemplate>
+                        </AppGridColumn>
+                        <AppGridColumn TItem="HallazgoVerificacion" Title="Detalle" ValueSelector="x => x.Detalle" />
+                    </Columns>
+                </AppGrid>
+            </AppCard>
+        }
+    </ChildContent>
+</AppPageContainer>
+
+@code {
+    private readonly IReadOnlyList<string> _snapshotComponents = new[] { "AppPageContainer", "AppCard", "AppGrid", "AppToolbar" };
+
+    private bool TieneDatos =>
+        ExplorerState.Resultados.Any() ||
+        ExplorerState.Hallazgos.Any() ||
+        ExplorerState.DocumentosVerificados.Any() ||
+        ExplorerState.Reciprocidades.Any();
+
+    private int DocumentosFaltantes => ExplorerState.DocumentosVerificados.Count(d => !d.Presente);
+    private decimal DiferenciaAbsoluta => ExplorerState.Reciprocidades.Sum(r => Math.Abs(r.Diferencia));
+    private string? _initError;
+    private bool _hayResultados;
+    private int _empresasConfiguradas;
+
+    private bool IsToolbarEnabled(string id)
+    {
+        return id switch
+        {
+            "persistExcel" => ExplorerState.Hallazgos.Any(),
+            _ => true
+        };
+    }
+
+    private async Task HandleToolbar(string id)
+    {
+        switch (id)
+        {
+            case "recalcular":
+                await ReconstruirAuditoriaAsync();
+                break;
+            case "persistExcel":
+                await PersistirHallazgosEnOrigen();
+                break;
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var config = await ConfigService.CargarConfiguracionAsync();
+            _empresasConfiguradas = config.Empresas.Count(e => !string.IsNullOrWhiteSpace(e.NombreEmpresa) && !string.IsNullOrWhiteSpace(e.NombreCarpeta));
+
+            if (!TieneDatos)
+            {
+                var savedState = await StatePersistence.CargarEstadoAsync();
+                if (savedState != null)
+                {
+                    AplicarEstadoPersistido(savedState);
+                }
+            }
+
+            _hayResultados = ExplorerState.Resultados.Any();
+
+            if (!TieneDatos && _empresasConfiguradas > 0)
+            {
+                var auditoriaBase = AuditoriaService.Auditar(Array.Empty<RegistroContable>(), ExplorerState.ArchivosSeleccionados, config);
+                ExplorerState.Hallazgos = auditoriaBase.Hallazgos;
+                ExplorerState.DocumentosVerificados = auditoriaBase.Documentos;
+                ExplorerState.Reciprocidades = auditoriaBase.Reciprocidades;
+            }
+
+            if (ExplorerState.Resultados.Any() && !ExplorerState.Hallazgos.Any())
+            {
+                await ReconstruirAuditoriaAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            _initError = $"No fue posible cargar el módulo de Análisis: {ex.Message}";
+        }
+    }
+
+    private async Task ReconstruirAuditoriaAsync()
+    {
+        var config = await ConfigService.CargarConfiguracionAsync();
+        var auditoria = AuditoriaService.Auditar(ExplorerState.Resultados, ExplorerState.ArchivosSeleccionados, config);
+
+        foreach (var hallazgo in auditoria.Hallazgos)
+        {
+            if (ExplorerState.EstadosHallazgos.TryGetValue(hallazgo.Id, out var estado))
+            {
+                hallazgo.Estado = estado;
+            }
+            else
+            {
+                ExplorerState.EstadosHallazgos[hallazgo.Id] = hallazgo.Estado;
+            }
+        }
+
+        ExplorerState.Hallazgos = auditoria.Hallazgos;
+        ExplorerState.DocumentosVerificados = auditoria.Documentos;
+        ExplorerState.Reciprocidades = auditoria.Reciprocidades;
+        await GuardarEstadoAsync();
+        Ui.ShowSuccess("Auditoría recalculada.");
+    }
+
+    private async Task CambiarEstadoHallazgo(HallazgoVerificacion hallazgo, string estado)
+    {
+        hallazgo.Estado = estado;
+        hallazgo.FechaActualizacionUtc = DateTime.UtcNow;
+        ExplorerState.EstadosHallazgos[hallazgo.Id] = estado;
+        await GuardarEstadoAsync();
+    }
+
+    private async Task PersistirHallazgosEnOrigen()
+    {
+        try
+        {
+            var archivos = ObtenerArchivosConReferencia().ToList();
+            if (!archivos.Any())
+            {
+                Ui.ShowWarning("Vuelva a cargar la carpeta o archivos para escribir las plantillas Excel.");
+                return;
+            }
+
+            var exportados = 0;
+            foreach (var item in archivos)
+            {
+                var hallazgos = ExplorerState.Hallazgos
+                    .Where(h => string.IsNullOrWhiteSpace(h.ArchivoOrigen) || h.ArchivoOrigen.Equals(item.Path, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+
+                if (!hallazgos.Any())
+                {
+                    continue;
+                }
+
+                await using var stream = item.BrowserFile!.OpenReadStream(maxAllowedSize: 100 * 1024 * 1024);
+                using var streamRef = new DotNetStreamReference(stream);
+                await JSRuntime.InvokeVoidAsync("excelInterop.persistirHallazgos", streamRef, item.Name, hallazgos);
+                exportados++;
+            }
+
+            if (exportados > 0)
+            {
+                Ui.ShowSuccess($"Se generaron {exportados} plantilla(s) con hallazgos.");
+            }
+            else
+            {
+                Ui.ShowInfo("No hubo hallazgos asociados a archivos disponibles.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Ui.ShowError(ex, "Error al persistir en Excel.");
+        }
+    }
+
+    private IEnumerable<FileTreeItem> ObtenerArchivosConReferencia()
+    {
+        foreach (var item in Recorrer(ExplorerState.TreeItems))
+        {
+            if (!item.IsFolder && item.BrowserFile != null)
+            {
+                yield return item;
+            }
+        }
+    }
+
+    private static IEnumerable<FileTreeItem> Recorrer(IEnumerable<FileTreeItem> items)
+    {
+        foreach (var item in items)
+        {
+            yield return item;
+
+            foreach (var child in Recorrer(item.Children))
+            {
+                yield return child;
+            }
+        }
+    }
+
+    private void AplicarEstadoPersistido(PersistenceState savedState)
+    {
+        ExplorerState.FunctionsBaseUrl = savedState.FunctionsBaseUrl;
+        ExplorerState.Resultados = savedState.Resultados;
+        ExplorerState.Hallazgos = savedState.Hallazgos;
+        ExplorerState.DocumentosVerificados = savedState.DocumentosVerificados;
+        ExplorerState.Reciprocidades = savedState.Reciprocidades;
+        ExplorerState.EstadosHallazgos = savedState.EstadosHallazgos;
+        ExplorerState.ArchivosProcesados = savedState.ArchivosProcesados;
+        ExplorerState.ArchivosSeleccionados = savedState.ArchivosSeleccionados;
+        ExplorerState.HaySesionPendiente = !savedState.SesionFinalizada && savedState.ArchivosProcesados.Any();
+    }
+
+    private async Task GuardarEstadoAsync()
+    {
+        await StatePersistence.GuardarEstadoAsync(new PersistenceState
+        {
+            FunctionsBaseUrl = ExplorerState.FunctionsBaseUrl,
+            Resultados = ExplorerState.Resultados,
+            Hallazgos = ExplorerState.Hallazgos,
+            DocumentosVerificados = ExplorerState.DocumentosVerificados,
+            Reciprocidades = ExplorerState.Reciprocidades,
+            EstadosHallazgos = ExplorerState.EstadosHallazgos,
+            ArchivosProcesados = ExplorerState.ArchivosProcesados,
+            ArchivosSeleccionados = ExplorerState.ArchivosSeleccionados,
+            SesionFinalizada = !ExplorerState.HaySesionPendiente
+        });
+    }
+}

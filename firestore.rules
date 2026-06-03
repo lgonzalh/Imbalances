@@ -1,0 +1,50 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /empresas/{empresaId} {
+      allow read: if true;
+      allow write: if false;
+
+      match /periodos/{periodoId} {
+        allow read: if true;
+        allow write: if false;
+
+        match /movimientos/{movId} {
+          allow read: if true;
+          allow write: if false;
+        }
+      }
+    }
+
+    match /cruces/{periodoId} {
+      allow read: if true;
+      allow write: if false;
+
+      match /resultados/{resultadoId} {
+        allow read: if true;
+        allow write: if false;
+      }
+    }
+
+    match /config_cuentas/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /config_empresas/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /config_notas/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /config_equivalencias/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+  }
+}

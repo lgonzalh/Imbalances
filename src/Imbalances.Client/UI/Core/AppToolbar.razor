@@ -1,0 +1,105 @@
+@using Imbalances.Client.UI.Core
+@using Microsoft.AspNetCore.Components.Forms
+@inject UiConfigService UiConfig
+
+<div class="app-toolbar" role="toolbar">
+    <div class="app-toolbar__label">ACCIONES</div>
+    <div class="app-toolbar__divider"></div>
+    <div class="app-toolbar__buttons">
+        @foreach (var action in _actions)
+        {
+            var enabled = IsEnabled?.Invoke(action.Id) ?? true;
+            if (action.FilePicker)
+            {
+                var inputId = $"app-toolbar-file-{PageKey}-{action.Id}";
+                <InputFile id="@inputId" OnChange="@((e) => HandleFile(action.Id, e))" class="app-toolbar__file" accept="@action.Accept" multiple="@action.Multiple" @attributes="GetFileAttributes(action, enabled)" />
+                @if (_selectedFiles.TryGetValue(action.Id, out var fileName))
+                {
+                    <span class="app-toolbar__filename">@fileName</span>
+                }
+                <label class="@(enabled ? GetButtonClass(action.Variant) : GetButtonClass(action.Variant) + " app-btn--disabled")" for="@inputId">@action.Label</label>
+            }
+            else
+            {
+                <button type="button" class="@GetButtonClass(action.Variant)" disabled="@(!enabled)" @onclick="() => Handle(action.Id)">@action.Label</button>
+            }
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public string PageKey { get; set; } = string.Empty;
+    [Parameter] public Func<string, Task>? OnAction { get; set; }
+    [Parameter] public Func<string, InputFileChangeEventArgs, Task>? OnFileAction { get; set; }
+    [Parameter] public Func<string, bool>? IsEnabled { get; set; }
+
+    private List<UiToolbarAction> _actions = new();
+    private Dictionary<string, string> _selectedFiles = new();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var cfg = await UiConfig.GetAsync();
+        var page = await UiConfig.GetPageAsync(PageKey);
+        _actions = page.Toolbar?.Actions?.Count > 0 ? page.Toolbar.Actions : cfg.Toolbar.Actions;
+
+        if (_actions.Count == 0)
+        {
+            _actions = BuildFallback(cfg.Toolbar);
+        }
+    }
+
+    private static List<UiToolbarAction> BuildFallback(UiToolbarConfig cfg)
+    {
+        var list = new List<UiToolbarAction>();
+        if (cfg.ShowExport) list.Add(new UiToolbarAction { Id = "export", Label = "Exportar", Variant = "secondary" });
+        if (cfg.ShowImport) list.Add(new UiToolbarAction { Id = "import", Label = "Importar", Variant = "secondary", FilePicker = true });
+        if (cfg.ShowLog) list.Add(new UiToolbarAction { Id = "log", Label = "Log", Variant = "secondary" });
+        if (cfg.ShowDelete) list.Add(new UiToolbarAction { Id = "delete", Label = "Eliminar", Variant = "danger" });
+        if (cfg.ShowSave) list.Add(new UiToolbarAction { Id = "save", Label = "Guardar", Variant = "primary" });
+        return list;
+    }
+
+    private async Task Handle(string id)
+    {
+        if (OnAction == null) return;
+        await OnAction(id);
+    }
+
+    private async Task HandleFile(string id, InputFileChangeEventArgs e)
+    {
+        _selectedFiles[id] = e.File.Name;
+        StateHasChanged();
+        
+        if (OnFileAction == null) return;
+        await OnFileAction(id, e);
+    }
+
+    private static string GetButtonClass(string variant)
+    {
+        return variant switch
+        {
+            "primary" => "app-btn btn-primary",
+            "danger" => "app-btn btn-danger",
+            "success" => "app-btn btn-success",
+            _ => "app-btn btn-secondary"
+        };
+    }
+
+    private static IReadOnlyDictionary<string, object>? GetFileAttributes(UiToolbarAction action, bool enabled)
+    {
+        if (!action.Directory && enabled) return null;
+
+        var dict = new Dictionary<string, object>();
+        if (action.Directory)
+        {
+            dict["webkitdirectory"] = "";
+            dict["directory"] = "";
+        }
+        if (!enabled)
+        {
+            dict["disabled"] = "disabled";
+        }
+
+        return dict.Count == 0 ? null : dict;
+    }
+}

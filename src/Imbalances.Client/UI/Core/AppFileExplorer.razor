@@ -1,0 +1,510 @@
+@using System.Text
+@using Imbalances.Client.Models
+@using Imbalances.Client.Services
+@using Imbalances.Core.Models
+@inject IProgressService ProgressService
+@inject IConfigService ConfigService
+@inject IExtractorEngine ExtractorEngine
+@inject IJSRuntime JS
+@inject ExplorerStateService ExplorerState
+@inject IStatePersistenceService StatePersistence
+@inject UiFeedbackService Ui
+@inject FirebaseMotorsService FirebaseMotors
+@inject IConfiguration AppConfig
+@implements IDisposable
+
+<div class="explorer-container">
+    <div class="explorer-layout">
+        <div class="panel left-panel">
+            <div class="panel-header explorer-header-grid">
+                <div class="brand-title">EXPLORADOR DE ARCHIVOS</div>
+                <div class="filter-container">
+                    <MudTextField @bind-Value="_searchString"
+                                  Placeholder="Filtro"
+                                  Adornment="Adornment.End"
+                                  AdornmentIcon="@Icons.Material.Filled.FilterList"
+                                  IconSize="Size.Small"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  Class="filter-input"
+                                  Immediate="true"
+                                  Clearable="true" />
+                </div>
+            </div>
+            <div class="panel-content scrollable">
+                <div class="explorer-inputs" aria-hidden="true">
+                    <InputFile id="folderInput" multiple OnChange="@((e) => OnBrowserFilesChanged("folderInput", e))" accept=".xlsx,.xls" @attributes="_folderPickerAttributes" />
+                    <InputFile id="filesInput" multiple OnChange="@((e) => OnBrowserFilesChanged("filesInput", e))" accept=".xlsx,.xls" />
+                </div>
+                @if (!TreeItems.Any())
+                {
+                    <div class="empty-state">
+                        <div class="empty-state__text">Seleccione la carpeta o archivos de cierre contable para iniciar el análisis.</div>
+                        <div class="empty-state__actions">
+                            <MudButton HtmlTag="label" for="folderInput" Variant="Variant.Filled" Color="Color.Primary" Class="px-6 py-2">Cargar Carpeta</MudButton>
+                            <MudButton HtmlTag="label" for="filesInput" Variant="Variant.Outlined" Color="Color.Primary" Class="px-6 py-2">Cargar Archivos</MudButton>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <MudTreeView T="FileTreeItem" Items="@(GetFilteredItems().Where(i => i.Visible).Cast<ITreeItemData<FileTreeItem>>().ToList())" Hover="true" Dense="true" Class="custom-tree" ExpandOnDoubleClick="true">
+                        <ItemTemplate Context="item">
+                            @if (item?.Value is FileTreeItem data)
+                            {
+                                <MudTreeViewItem T="FileTreeItem" @bind-Expanded="data.Expanded" Items="@(data.Children.Where(c => c.Visible).Cast<ITreeItemData<FileTreeItem>>().ToList())" Class="tree-item">
+                                    <Content>
+                                        <div class="tree-item-content @data.IndentClass">
+                                            <div class="tree-toggle-container">
+                                                @if (data.HasChildren)
+                                                {
+                                                    <MudIconButton Icon="@(data.Expanded ? Icons.Material.Filled.ArrowDropDown : Icons.Material.Filled.ArrowRight)"
+                                                                   Size="Size.Small"
+                                                                   OnClick="@(() => data.Expanded = !data.Expanded)"
+                                                                   Class="tree-arrow-btn" />
+                                                }
+                                            </div>
+
+                                            @if (data.IsFolder)
+                                            {
+                                                <MudIcon Icon="@(data.Expanded ? Icons.Material.Filled.FolderOpen : Icons.Material.Filled.Folder)" Size="Size.Small" Class="mr-2" />
+                                            }
+                                            else
+                                            {
+                                                <MudIcon Icon="@Icons.Custom.FileFormats.FileExcel" Size="Size.Small" Color="Color.Success" Class="mr-2" />
+                                            }
+
+                                            <MudCheckBox T="bool?" Value="data.IsSelected" ValueChanged="@((v) => data.IsSelected = v)" Color="Color.Primary" Dense="true" Class="tree-checkbox" TriState="false" />
+
+                                            <div class="tree-text">@data.Text</div>
+                                        </div>
+                                    </Content>
+                                </MudTreeViewItem>
+                            }
+                        </ItemTemplate>
+                    </MudTreeView>
+                }
+            </div>
+        </div>
+
+        <div class="panel right-panel">
+            <div class="panel-header right-header">
+                <div class="brand-title">ORDEN DE PROCESAMIENTO</div>
+                <MudChip T="string" Color="Color.Dark" Variant="Variant.Filled" Size="Size.Small" Class="selected-count-chip">@GetSelectedFiles(onlyVisible: true).Count seleccionados</MudChip>
+            </div>
+            <div class="panel-content scrollable pa-4">
+                @if (!GetSelectedFiles(onlyVisible: true).Any())
+                {
+                    <div class="empty-right">No hay archivos seleccionados para procesar.</div>
+                }
+                else
+                {
+                    @foreach (var file in GetSelectedFiles(onlyVisible: true))
+                    {
+                        <div class="file-card">
+                            <div class="file-card-info">
+                                <MudIcon Icon="@Icons.Custom.FileFormats.FileExcel" Size="Size.Medium" Color="Color.Success" />
+                                <div class="file-card-text">
+                                    <div class="file-name">@file.Name</div>
+                                    @if (!string.Equals(file.Path, file.Name, StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        <div class="file-path">@file.Path</div>
+                                    }
+                                </div>
+                            </div>
+                            <MudIconButton Icon="@Icons.Material.Filled.RemoveCircleOutline" Color="Color.Error" Size="Size.Small" OnClick="@(() => RemoveFile(file))" />
+                        </div>
+                    }
+                }
+            </div>
+            <div class="panel-footer">
+                <MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="Cancelar" Class="footer-btn">Limpiar Todo</MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ProcesarSeleccion" Disabled="@(!GetSelectedFiles(onlyVisible: false).Any(f => f.BrowserFile != null))" Class="footer-btn confirm-btn px-8">Iniciar</MudButton>
+            </div>
+        </div>
+    </div>
+
+    @if (procesando)
+    {
+        <AppProgress Logs="logsProcesamiento" ProgressValue="GetProgressValue()" ProgressText="GetProgressText()" LogIconResolver="GetLogIcon" LogColorResolver="GetLogColor" />
+    }
+</div>
+
+@code {
+    private string _searchString = string.Empty;
+    private List<LogProceso> logsProcesamiento = new();
+    private bool procesando;
+
+    private DotNetObjectReference<AppFileExplorer>? _dotNetRef;
+    private readonly Dictionary<string, List<IBrowserFile>> _pendingBrowserFiles = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, List<JsFileInfo>> _pendingJsFiles = new(StringComparer.OrdinalIgnoreCase);
+    private readonly IReadOnlyDictionary<string, object> _folderPickerAttributes = new Dictionary<string, object>
+    {
+        ["webkitdirectory"] = "",
+        ["directory"] = ""
+    };
+
+    private List<FileTreeItem> TreeItems
+    {
+        get => ExplorerState.TreeItems;
+        set => ExplorerState.TreeItems = value;
+    }
+
+    protected override void OnInitialized()
+    {
+        ProgressService.OnChange += OnProgressChanged;
+        OnProgressChanged();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        _dotNetRef = DotNetObjectReference.Create(this);
+        try
+        {
+            await JS.InvokeVoidAsync("fileExplorer.getFiles", "folderInput", _dotNetRef);
+            await JS.InvokeVoidAsync("fileExplorer.getFiles", "filesInput", _dotNetRef);
+        }
+        catch
+        {
+        }
+    }
+
+    public void Dispose()
+    {
+        ProgressService.OnChange -= OnProgressChanged;
+        _dotNetRef?.Dispose();
+    }
+
+    private Task HandleToolbarAction(string id)
+    {
+        return id switch
+        {
+            "loadFolder" => ClickInput("folderInput"),
+            "loadFiles" => ClickInput("filesInput"),
+            "clear" => Cancelar(),
+            "start" => ProcesarSeleccion(),
+            _ => Task.CompletedTask
+        };
+    }
+
+    private async Task ClickInput(string inputId)
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("fileExplorer.clickInput", inputId);
+        }
+        catch
+        {
+        }
+    }
+
+    private void OnProgressChanged()
+    {
+        var progreso = ProgressService.ObtenerEstado();
+        logsProcesamiento = progreso.Logs.ToList();
+        procesando = progreso.TotalSteps > 0 && progreso.CurrentStep < progreso.TotalSteps;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private double GetProgressValue()
+    {
+        var progreso = ProgressService.ObtenerEstado();
+        if (progreso.TotalSteps <= 0) return 0;
+        return Math.Min(100, Math.Max(0, (double)progreso.CurrentStep / progreso.TotalSteps * 100));
+    }
+
+    private string GetProgressText()
+    {
+        var progreso = ProgressService.ObtenerEstado();
+        if (progreso.TotalSteps <= 0) return string.Empty;
+        return $"{progreso.EtapaActual} ({progreso.CurrentStep} de {progreso.TotalSteps})";
+    }
+
+    private Color GetLogColor(string estado)
+    {
+        return estado switch
+        {
+            "Success" => Color.Success,
+            "Error" => Color.Error,
+            "Warning" => Color.Warning,
+            "Info" => Color.Info,
+            _ => Color.Info
+        };
+    }
+
+    private string GetLogIcon(string estado)
+    {
+        return estado switch
+        {
+            "Success" => Icons.Material.Filled.CheckCircle,
+            "Error" => Icons.Material.Filled.Error,
+            "Warning" => Icons.Material.Filled.Warning,
+            "Info" => Icons.Material.Filled.Info,
+            _ => Icons.Material.Filled.Info
+        };
+    }
+
+    private List<FileTreeItem> GetFilteredItems()
+    {
+        if (string.IsNullOrWhiteSpace(_searchString))
+        {
+            SetVisibility(TreeItems, true);
+            return TreeItems;
+        }
+
+        var filter = _searchString.Trim();
+        ApplyFilter(TreeItems, filter);
+        return TreeItems;
+    }
+
+    private static bool ApplyFilter(IEnumerable<FileTreeItem> items, string filter)
+    {
+        var anyVisible = false;
+        foreach (var item in items)
+        {
+            var childVisible = ApplyFilter(item.Children, filter);
+            var selfVisible = (item.Text ?? string.Empty).Contains(filter, StringComparison.OrdinalIgnoreCase);
+            item.Visible = selfVisible || childVisible;
+            anyVisible |= item.Visible;
+        }
+
+        return anyVisible;
+    }
+
+    private static void SetVisibility(IEnumerable<FileTreeItem> items, bool visible)
+    {
+        foreach (var item in items)
+        {
+            item.Visible = visible;
+            SetVisibility(item.Children, visible);
+        }
+    }
+
+    private sealed class FileJSData
+    {
+        public string Name { get; set; } = string.Empty;
+        public string Path { get; set; } = string.Empty;
+        public IBrowserFile? BrowserFile { get; set; }
+    }
+
+    private List<FileJSData> GetSelectedFiles(bool onlyVisible)
+    {
+        GetFilteredItems();
+        var result = new List<FileJSData>();
+        foreach (var item in Recorrer(TreeItems))
+        {
+            if (item.IsFolder) continue;
+            if (item.IsSelected != true) continue;
+            if (onlyVisible && !item.Visible) continue;
+            result.Add(new FileJSData { Name = item.Name, Path = item.Path, BrowserFile = item.BrowserFile });
+        }
+        return result;
+    }
+
+    private static IEnumerable<FileTreeItem> Recorrer(IEnumerable<FileTreeItem> items)
+    {
+        foreach (var item in items)
+        {
+            yield return item;
+            foreach (var child in Recorrer(item.Children)) yield return child;
+        }
+    }
+
+    private void RemoveFile(FileJSData file)
+    {
+        foreach (var item in Recorrer(TreeItems))
+        {
+            if (item.IsFolder) continue;
+            if (string.Equals(item.Path, file.Path, StringComparison.OrdinalIgnoreCase))
+            {
+                item.IsSelected = false;
+                break;
+            }
+        }
+    }
+
+    private async Task Cancelar()
+    {
+        logsProcesamiento.Clear();
+        procesando = false;
+        ExplorerState.Clear();
+        TreeItems = new List<FileTreeItem>();
+        await StatePersistence.LimpiarEstadoAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private Task OnBrowserFilesChanged(string inputId, InputFileChangeEventArgs e)
+    {
+        _pendingBrowserFiles[inputId] = e.GetMultipleFiles(500).ToList();
+        return TryBuildTreeAsync(inputId);
+    }
+
+    [JSInvokable]
+    public Task OnFilesSelectedJS(string inputId, List<JsFileInfo> files)
+    {
+        _pendingJsFiles[inputId] = files ?? new List<JsFileInfo>();
+        return TryBuildTreeAsync(inputId);
+    }
+
+    private async Task TryBuildTreeAsync(string inputId)
+    {
+        if (!_pendingBrowserFiles.TryGetValue(inputId, out var browserFiles)) return;
+        if (!_pendingJsFiles.TryGetValue(inputId, out var jsFiles)) return;
+
+        try
+        {
+            var tree = BuildTree(browserFiles, jsFiles);
+            TreeItems = tree;
+            ExplorerState.BrowserFiles = browserFiles;
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (Exception ex)
+        {
+            Ui.ShowError(ex, "Error al construir el explorador.");
+        }
+        finally
+        {
+            _pendingBrowserFiles.Remove(inputId);
+            _pendingJsFiles.Remove(inputId);
+        }
+    }
+
+    private static List<FileTreeItem> BuildTree(IReadOnlyList<IBrowserFile> browserFiles, IReadOnlyList<JsFileInfo> jsFiles)
+    {
+        var roots = new List<FileTreeItem>();
+        var folderByPath = new Dictionary<string, FileTreeItem>(StringComparer.OrdinalIgnoreCase);
+
+        for (var i = 0; i < jsFiles.Count; i++)
+        {
+            var js = jsFiles[i];
+            var path = (js.Path ?? js.Name ?? string.Empty).Replace('\\', '/');
+            if (string.IsNullOrWhiteSpace(path)) continue;
+
+            var parts = path.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            if (parts.Length == 0) continue;
+
+            var currentPath = "";
+            FileTreeItem? parent = null;
+            for (var p = 0; p < parts.Length; p++)
+            {
+                currentPath = string.IsNullOrWhiteSpace(currentPath) ? parts[p] : $"{currentPath}/{parts[p]}";
+                var isLeaf = p == parts.Length - 1;
+
+                if (isLeaf)
+                {
+                    var node = new FileTreeItem
+                    {
+                        Name = parts[p],
+                        Path = currentPath,
+                        IsFolder = false,
+                        Level = p,
+                        BrowserFile = i < browserFiles.Count ? browserFiles[i] : null
+                    };
+
+                    if (parent == null) roots.Add(node);
+                    else parent.Children.Add(node);
+                }
+                else
+                {
+                    if (!folderByPath.TryGetValue(currentPath, out var folder))
+                    {
+                        folder = new FileTreeItem
+                        {
+                            Name = parts[p],
+                            Path = currentPath,
+                            IsFolder = true,
+                            Level = p,
+                            IsExpanded = true
+                        };
+                        folderByPath[currentPath] = folder;
+
+                        if (parent == null) roots.Add(folder);
+                        else parent.Children.Add(folder);
+                    }
+
+                    parent = folder;
+                }
+            }
+        }
+
+        return roots;
+    }
+
+    public sealed class JsFileInfo
+    {
+        public string? Name { get; set; }
+        public string? Path { get; set; }
+        public long Size { get; set; }
+        public string? LastModified { get; set; }
+    }
+
+    private async Task ProcesarSeleccion()
+    {
+        if (procesando) return;
+        var selected = GetSelectedFiles(onlyVisible: false).Where(f => f.BrowserFile != null).ToList();
+        if (!selected.Any())
+        {
+            Ui.ShowWarning("No hay archivos seleccionados.");
+            return;
+        }
+
+        try
+        {
+            procesando = true;
+            var config = await ConfigService.CargarConfiguracionAsync();
+
+            ExplorerState.Clear();
+            ExplorerState.TreeItems = TreeItems;
+            ExplorerState.BrowserFiles = selected.Select(s => s.BrowserFile!).ToList();
+            ExplorerState.ArchivosSeleccionados = selected.Select(s => s.Path).ToList();
+            ExplorerState.IsProcessing = true;
+
+            ProgressService.Inicializar(selected.Count);
+
+            var resultados = new List<RegistroContable>();
+            foreach (var item in selected)
+            {
+                ProgressService.Avanzar($"Procesando: {item.Name}");
+                await using var stream = item.BrowserFile!.OpenReadStream(maxAllowedSize: 100 * 1024 * 1024);
+                var regs = await ExtractorEngine.ProcesarArchivoAsync(item.Path, stream, config, (msg) => ProgressService.Log(msg, InferEstado(msg)));
+                resultados.AddRange(regs);
+                ExplorerState.ArchivosProcesados.Add(item.Path);
+            }
+
+            ExplorerState.Resultados = resultados;
+            ExplorerState.IsProcessing = false;
+            await StatePersistence.GuardarEstadoAsync(new PersistenceState
+            {
+                Resultados = ExplorerState.Resultados,
+                Hallazgos = ExplorerState.Hallazgos,
+                DocumentosVerificados = ExplorerState.DocumentosVerificados,
+                Reciprocidades = ExplorerState.Reciprocidades,
+                EstadosHallazgos = ExplorerState.EstadosHallazgos,
+                ArchivosProcesados = ExplorerState.ArchivosProcesados,
+                ArchivosSeleccionados = ExplorerState.ArchivosSeleccionados,
+                SesionFinalizada = true
+            });
+        }
+        catch (Exception ex)
+        {
+            Ui.ShowError(ex, "Error durante el procesamiento.");
+        }
+        finally
+        {
+            procesando = false;
+            ExplorerState.IsProcessing = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private static string InferEstado(string? msg)
+    {
+        if (string.IsNullOrWhiteSpace(msg)) return "Info";
+        var t = msg.Trim();
+        if (t.StartsWith("[Error]", StringComparison.OrdinalIgnoreCase)) return "Error";
+        if (t.StartsWith("[Warning]", StringComparison.OrdinalIgnoreCase)) return "Warning";
+        if (t.StartsWith("[Success]", StringComparison.OrdinalIgnoreCase)) return "Success";
+        return "Info";
+    }
+}

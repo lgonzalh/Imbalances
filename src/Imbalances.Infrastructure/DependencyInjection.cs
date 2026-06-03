@@ -10,6 +10,8 @@ public static class DependencyInjection
     {
         services.AddScoped<IProgressService, ProgressService>();
         services.AddScoped<IConfigService, ConfigService>();
+        services.AddScoped<IAuditoriaService, AuditoriaService>();
+        services.AddScoped<IMotor1Extractor, Motor1Extractor>();
         services.AddScoped<IExtractorEngine, ExtractorEngine>();
         services.AddScoped<IExcelProvider, ExcelProvider>();
 

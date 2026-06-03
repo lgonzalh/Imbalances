@@ -1,0 +1,45 @@
+@using Imbalances.Core.Models
+
+<AppCard Title="PROCESANDO ARCHIVOS" Collapsible="false">
+    <div class="app-progress">
+        <div class="app-progress__bar">
+            <MudProgressLinear Color="Color.Primary" Size="Size.Large" Striped="true" Value="@ProgressValue" Min="0" Max="100" />
+            <div class="app-progress__text">@ProgressText</div>
+        </div>
+
+        @if (Logs.Any())
+        {
+            <div class="app-progress__log">
+                <div class="app-progress__log-list">
+                    @foreach (var log in Logs.TakeLast(120))
+                    {
+                        <div class="app-progress__log-row">
+                            <MudIcon Icon="@GetLogIcon(log.Estado)" Size="Size.Small" Color="@GetLogColor(log.Estado)" />
+                            <div class="app-progress__log-text">@log.Mensaje</div>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+</AppCard>
+
+@code {
+    [Parameter] public IReadOnlyList<LogProceso> Logs { get; set; } = Array.Empty<LogProceso>();
+    [Parameter] public double ProgressValue { get; set; }
+    [Parameter] public string ProgressText { get; set; } = string.Empty;
+
+    [Parameter] public Func<string, string>? LogIconResolver { get; set; }
+    [Parameter] public Func<string, Color>? LogColorResolver { get; set; }
+
+    private string GetLogIcon(string estado)
+    {
+        return LogIconResolver?.Invoke(estado) ?? Icons.Material.Filled.Info;
+    }
+
+    private Color GetLogColor(string estado)
+    {
+        return LogColorResolver?.Invoke(estado) ?? Color.Info;
+    }
+}
+

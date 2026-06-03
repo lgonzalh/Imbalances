@@ -18,10 +18,15 @@ window.fileExplorer = {
                 }
             }
             // Retorna al componente de Blazor
-            dotNetHelper.invokeMethodAsync('OnFilesSelectedJS', fileList);
+            dotNetHelper.invokeMethodAsync('OnFilesSelectedJS', inputElementId, fileList);
         });
     },
     clickInput: function(inputElementId) {
         document.getElementById(inputElementId).click();
+    },
+    resetInput: function (inputElementId) {
+        const input = document.getElementById(inputElementId);
+        if (!input) return;
+        input.value = '';
     }
 };

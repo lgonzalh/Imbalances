@@ -3,6 +3,16 @@
 @inject IConfigService ConfigService
 @inject IExtractorEngine ExtractorEngine
 @inject IJSRuntime JS
+@inject Imbalances.Client.Services.ExplorerStateService ExplorerState
+@inject Imbalances.Client.Services.IStatePersistenceService StatePersistence
+@inject FirebaseMotorsService FirebaseMotors
+@inject UiFeedbackService Ui
+@inject IConfiguration Configuration
+@using Microsoft.Extensions.Configuration
+@using System.Text
+@using Imbalances.Core.Models
+@using Imbalances.Client.Services
+@using Imbalances.Client.Models
 @implements IDisposable
 
 <PageTitle>Imbalances - Explorador de Datos</PageTitle>
@@ -14,13 +24,13 @@
             <div class="panel-header explorer-header-grid">
                 <MudText Typo="Typo.h6" Class="brand-title">EXPLORADOR DE ARCHIVOS</MudText>
                 <div class="filter-container">
-                    <MudTextField @bind-Value="_searchString" 
-                                  Placeholder="Filtro" 
-                                  Adornment="Adornment.End" 
-                                  AdornmentIcon="@Icons.Material.Filled.FilterList" 
+                    <MudTextField @bind-Value="_searchString"
+                                  Placeholder="Filtro"
+                                  Adornment="Adornment.End"
+                                  AdornmentIcon="@Icons.Material.Filled.FilterList"
                                   IconSize="Size.Small"
-                                  Variant="Variant.Outlined" 
-                                  Margin="Margin.Dense" 
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
                                   Class="filter-input"
                                   Immediate="true"
                                   Clearable="true" />
@@ -29,7 +39,7 @@
             <div class="panel-content scrollable">
                 <InputFile id="folderInput" multiple OnChange="OnInputFileChanged" style="display: none;" accept=".xlsx,.xls" webkitdirectory directory />
                 <InputFile id="filesInput" multiple OnChange="OnInputFileChanged" style="display: none;" accept=".xlsx,.xls" />
-                
+
                 @if (!TreeItems.Any())
                 {
                     <div class="d-flex flex-column align-center justify-center h-100 pa-10">
@@ -46,26 +56,41 @@
                 }
                 else
                 {
-                    <MudTreeView T="TreeItemData" Items="@GetFilteredItems().Where(i => i.Visible).ToList()" Hover="true" Dense="true" Class="custom-tree" 
-                                 ExpandOnDoubleClick="true">
+                            <MudTreeView T="FileTreeItem" Items="@(GetFilteredItems().Where(i => i.Visible).Cast<ITreeItemData<FileTreeItem>>().ToList())" Hover="true" Dense="true" Class="custom-tree" ExpandOnDoubleClick="true">
                         <ItemTemplate Context="item">
-                            <MudTreeViewItem T="TreeItemData" @bind-Expanded="@item.Value.IsExpanded" Items="@item.Children.Where(c => c.Visible).ToList()" Class="tree-item">
-                                <Content>
-                                    <div class="tree-item-content">
-                                        @if (item.Value.IsFolder)
-                                        {
-                                            <MudIcon Icon="@Icons.Material.Outlined.Folder" Size="Size.Small" Color="Color.Default" Class="mr-2" />
-                                        }
-                                        else
-                                        {
-                                            <MudIcon Icon="@Icons.Custom.FileFormats.FileExcel" Size="Size.Small" Color="Color.Success" Class="mr-2" />
-                                        }
-                                        <MudCheckBox T="bool?" Value="item.Value.IsSelected" ValueChanged="@((v) => item.Value.IsSelected = v)" 
-                                                     Color="Color.Primary" Dense="true" Class="tree-checkbox" TriState="false" />
-                                        <MudText Typo="Typo.body2" Class="tree-text">@item.Text</MudText>
-                                    </div>
-                                </Content>
-                            </MudTreeViewItem>
+                            @if (item?.Value is FileTreeItem data)
+                            {
+                                <MudTreeViewItem T="FileTreeItem" @bind-Expanded="data.Expanded" Items="@(data.Children.Where(c => c.Visible).Cast<ITreeItemData<FileTreeItem>>().ToList())" Class="tree-item">
+                                    <Content>
+                                        <div class="tree-item-content" style="@($"margin-left: {data.Level * 16}px;")">
+                                            <div class="tree-toggle-container">
+                                                @if (data.HasChildren)
+                                                {
+                                                    <MudIconButton Icon="@(data.Expanded ? Icons.Material.Filled.ArrowDropDown : Icons.Material.Filled.ArrowRight)"
+                                                                   Size="Size.Small"
+                                                                   OnClick="@(() => data.Expanded = !data.Expanded)"
+                                                                   Class="tree-arrow-btn" />
+                                                }
+                                            </div>
+
+                                            @if (data.IsFolder)
+                                            {
+                                                <MudIcon Icon="@(data.Expanded ? Icons.Material.Filled.FolderOpen : Icons.Material.Filled.Folder)"
+                                                         Size="Size.Small" Color="Color.Default" Class="mr-2" />
+                                            }
+                                            else
+                                            {
+                                                <MudIcon Icon="@Icons.Custom.FileFormats.FileExcel" Size="Size.Small" Color="Color.Success" Class="mr-2" />
+                                            }
+
+                                            <MudCheckBox T="bool?" Value="data.IsSelected" ValueChanged="@((v) => data.IsSelected = v)"
+                                                         Color="Color.Primary" Dense="true" Class="tree-checkbox" TriState="false" />
+
+                                            <MudText Typo="Typo.body2" Class="tree-text">@data.Text</MudText>
+                                        </div>
+                                    </Content>
+                                </MudTreeViewItem>
+                            }
                         </ItemTemplate>
                     </MudTreeView>
                 }
@@ -102,46 +127,40 @@
                     }
                 }
             </div>
+            @if (procesando)
+            {
+                <div class="panel-section">
+                    <div class="panel-section-header">PROCESANDO ARCHIVOS</div>
+                    <div class="panel-section-body">
+                        <MudProgressLinear Color="Color.Primary" Size="Size.Large" Striped="true" Value="@GetProgressValue()" Min="0" Max="100" />
+                        <MudText Typo="Typo.body2" Class="mt-2" Style="color: #002C54;">@GetProgressText()</MudText>
+                    </div>
+                </div>
+            }
+            @if (logsProcesamiento.Any())
+            {
+                <div class="panel-section">
+                    <div class="panel-section-header">LOG</div>
+                    <div class="log-container">
+                        @foreach (var log in logsProcesamiento)
+                        {
+                            <div class="log-entry @GetLogCssClass(log.Estado)">
+                                <span class="log-timestamp">[@log.Timestamp.ToString("yyyy-MM-dd HH:mm:ss")]</span>
+                                <span class="log-level">[@log.Estado]</span>
+                                <span class="log-message">@log.Mensaje</span>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
             <div class="panel-footer">
-                <MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="Cancelar" Class="footer-btn">Limpiar Todo</MudButton>
+                <MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="Cancelar" Class="footer-btn">Limpiar</MudButton>
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ProcesarSeleccion" Disabled="@(!GetSelectedFiles().Any())" Class="footer-btn confirm-btn px-8">
                     Iniciar
                 </MudButton>
             </div>
         </div>
     </div>
-
-    @if (resultados.Any())
-    {
-        <MudItem xs="12" Class="mt-6">
-            <MudCard Elevation="1" Style="border: 1px solid #DAE0E6;">
-                <MudCardHeader Style="background-color: #F8F9FA; border-bottom: 1px solid #DAE0E6;">
-                    <CardHeaderContent>
-                        <MudText Typo="Typo.h6" Style="color: #002C54; font-weight: 700;">CONSOLIDADO DE EXTRACCIÓN</MudText>
-                    </CardHeaderContent>
-                    <CardHeaderActions>
-                        <MudButton Color="Color.Primary" Variant="Variant.Text">Descargar</MudButton>
-                    </CardHeaderActions>
-                </MudCardHeader>
-                <MudCardContent Class="pa-0">
-                    <MudDataGrid Items="@resultados" Dense="true" Hover="true" Striped="true" FixedHeader="true" Height="450px" Class="results-grid">
-                        <Columns>
-                            <PropertyColumn Property="x => x.Empresa" Title="Empresa" />
-                            <PropertyColumn Property="x => x.Cuenta" Title="Cuenta Contable" />
-                            <PropertyColumn Property="x => x.Categoria" Title="Categoría" />
-                            <PropertyColumn Property="x => x.Tipo" Title="Naturaleza" />
-                            <PropertyColumn Property="x => x.Nota" Title="Nota Ref." />
-                            <PropertyColumn Property="x => x.Valor" Title="Saldo Local" Format="N2">
-                                <CellTemplate>
-                                    <MudText Style="font-weight: 600; color: #002C54;">@context.Item.Valor.ToString("N2")</MudText>
-                                </CellTemplate>
-                            </PropertyColumn>
-                        </Columns>
-                    </MudDataGrid>
-                </MudCardContent>
-            </MudCard>
-        </MudItem>
-    }
 </div>
 
 <style>
@@ -213,6 +232,7 @@
 
     .scrollable {
         overflow-y: auto;
+        overflow-x: hidden;
     }
 
     .panel-footer {
@@ -228,23 +248,45 @@
 
     .custom-tree {
         padding: 8px;
+        overflow-x: hidden !important;
+    }
+
+    .tree-item {
+        overflow-x: hidden !important;
+        max-width: 100% !important;
+    }
+
+    /* Target MudBlazor internals to prevent internal scrolling */
+    .mud-treeview-item-content {
+        overflow-x: hidden !important;
+        max-width: 100% !important;
     }
 
     .tree-item-content {
         display: flex;
         align-items: center;
         width: 100%;
-        padding: 2px 0;
+        padding: 1px 0;
+        overflow: hidden !important;
+        min-width: 0;
     }
 
-    .tree-item-main {
+    .tree-toggle-container {
+        width: 32px;
         display: flex;
+        justify-content: center;
         align-items: center;
-        flex-grow: 1;
+        flex-shrink: 0;
+    }
+
+    .tree-arrow-btn {
+        padding: 4px !important;
+        color: #6C757D;
+        transition: transform 0.2s ease;
     }
 
     .tree-checkbox {
-        padding: 4px !important;
+        padding: 2px !important;
         margin-right: 4px;
     }
 
@@ -252,6 +294,11 @@
         color: #002C54;
         font-weight: 500;
         font-size: 0.85rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        flex: 1 1 auto;
+        min-width: 0;
     }
 
     .selected-count-chip {
@@ -320,71 +367,98 @@
     .results-grid {
         border: none !important;
     }
+
+    .panel-section {
+        border-top: 1px solid #DAE0E6;
+        flex-shrink: 0;
+    }
+
+    .panel-section-header {
+        padding: 8px 20px;
+        background-color: #F8F9FA;
+        color: #002C54;
+        font-weight: 700;
+        font-size: 0.8rem;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+    }
+
+    .panel-section-body {
+        padding: 12px 20px;
+    }
+
+    .log-container {
+        background-color: #ffffff;
+        color: #adb5bd;
+        font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+        font-size: 0.8rem;
+        line-height: 1.4;
+        padding: 12px 16px;
+        height: 180px;
+        overflow-y: auto;
+    }
+
+    .log-entry {
+        margin-bottom: 2px;
+        padding: 2px 0;
+    }
+
+    .log-timestamp {
+        color: #ced4da;
+        margin-right: 8px;
+    }
+
+    .log-level {
+        font-weight: bold;
+        margin-right: 8px;
+        padding: 0 4px;
+        border-radius: 2px;
+    }
+
+    .log-info .log-level {
+        background-color: #007acc;
+        color: white;
+    }
+
+    .log-success .log-level {
+        background-color: #16825d;
+        color: white;
+    }
+
+    .log-error .log-level {
+        background-color: #e51400;
+        color: white;
+    }
+
+    .log-warning .log-level {
+        background-color: #ff8c00;
+        color: white;
+    }
 </style>
 
 @code {
     private List<IBrowserFile> _browserFiles = new();
-    private List<TreeItemData> TreeItems { get; set; } = new();
+    private List<FileTreeItem> TreeItems { get; set; } = new();
     private string _searchString = "";
-
-    public class TreeItemData : ITreeItemData<TreeItemData>
-    {
-        public string Name { get; set; } = string.Empty;
-        public string Path { get; set; } = string.Empty;
-        public bool IsFolder { get; set; }
-        public IBrowserFile? BrowserFile { get; set; }
-        
-        private bool? _isSelected = false;
-        public bool? IsSelected 
-        { 
-            get 
-            {
-                if (!IsFolder) return _isSelected;
-                if (!Children.Any()) return _isSelected;
-                
-                bool allSelected = Children.All(c => c.IsSelected == true);
-                bool noneSelected = Children.All(c => c.IsSelected == false);
-                
-                if (allSelected) return true;
-                if (noneSelected) return false;
-                return null; // Indeterminate
-            }
-            set 
-            {
-                _isSelected = value ?? false;
-                if (IsFolder)
-                {
-                    foreach (var child in Children)
-                    {
-                        child.IsSelected = value;
-                    }
-                }
-            } 
-        }
-        public bool IsExpanded { get; set; } = true;
-        public List<TreeItemData> Children { get; set; } = new();
-
-        public string? Text { get => Name; set => Name = value ?? ""; }
-        public string? Icon { get; set; }
-        public string? IconColor { get; set; }
-        public string? SelectedIcon { get; set; }
-        public bool Expanded { get => IsExpanded; set => IsExpanded = value; }
-        public bool Selected { get => IsSelected == true; set => IsSelected = value; }
-        public bool Disabled { get; set; }
-        public bool? Loading { get; set; }
-        public bool Visible { get; set; } = true;
-        public bool Expandable { get => true; set { } }
-        public bool HasChildren => Children.Any();
-        IReadOnlyCollection<ITreeItemData<TreeItemData>>? ITreeItemData<TreeItemData>.Children { get => Children; set { } }
-        public IReadOnlyCollection<TreeItemData>? Items => Children;
-        public TreeItemData? Value { get => this; set { } }
-    }
+    private List<LogProceso> logsProcesamiento = new();
+    private bool procesando = false;
+    private List<FileJSData>? _pendingJsFiles;
+    private Dictionary<string, IBrowserFile> _browserFileByPath = new(StringComparer.OrdinalIgnoreCase);
+    private List<RegistroContable> _previewResultados = new();
+    private string _functionsBaseUrl = string.Empty;
+    private string _periodo = DateTime.Now.ToString("yyyy-MM");
+    private decimal _tolerancia = 0;
 
     private DotNetObjectReference<Home>? _objRef;
 
     protected override void OnInitialized()
     {
         _objRef = DotNetObjectReference.Create(this);
+        _functionsBaseUrl = ExplorerState.FunctionsBaseUrl;
+        if (string.IsNullOrWhiteSpace(_functionsBaseUrl))
+        {
+            _functionsBaseUrl = Configuration["Firebase:FunctionsBaseUrl"] ?? string.Empty;
+        }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -406,12 +480,15 @@
         _browserFiles = e.GetMultipleFiles(maximumFileCount: 5000)
                          .Where(f => f.Name.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase) || f.Name.EndsWith(".xls", StringComparison.OrdinalIgnoreCase))
                          .ToList();
+
+        TryRebuildTree();
     }
 
     [JSInvokable]
-    public void OnFilesSelectedJS(List<FileJSData> files)
+    public void OnFilesSelectedJS(string inputId, List<FileJSData> files)
     {
-        TreeItems = BuildTree(files);
+        _pendingJsFiles = files;
+        TryRebuildTree();
         StateHasChanged();
     }
 
@@ -420,11 +497,98 @@
         public string name { get; set; } = string.Empty;
         public string path { get; set; } = string.Empty;
         public long size { get; set; }
+        public string lastModified { get; set; } = string.Empty;
     }
 
-    private List<TreeItemData> BuildTree(List<FileJSData> jsFiles)
+    private void TryRebuildTree()
     {
-        var root = new TreeItemData { IsFolder = true, Name = "root", Path = "" };
+        if (_pendingJsFiles == null)
+        {
+            return;
+        }
+
+        if (_browserFiles.Count == 0)
+        {
+            return;
+        }
+
+        _browserFileByPath = BuildBrowserFileMap(_pendingJsFiles, _browserFiles);
+        TreeItems = BuildTree(_pendingJsFiles, _browserFileByPath);
+        ExplorerState.TreeItems = TreeItems;
+        ExplorerState.BrowserFiles = _browserFiles;
+    }
+
+    private static Dictionary<string, IBrowserFile> BuildBrowserFileMap(List<FileJSData> jsFiles, List<IBrowserFile> browserFiles)
+    {
+        var map = new Dictionary<string, IBrowserFile>(StringComparer.OrdinalIgnoreCase);
+
+        var index = browserFiles
+            .GroupBy(b => (b.Name, b.Size, UtcMillis(b.LastModified)))
+            .ToDictionary(g => g.Key, g => g.First());
+
+        foreach (var jsFile in jsFiles)
+        {
+            var browserFile = TryFindBrowserFile(index, jsFile);
+            if (browserFile == null) continue;
+            if (string.IsNullOrWhiteSpace(jsFile.path)) continue;
+            map[jsFile.path] = browserFile;
+        }
+
+        return map;
+    }
+
+    private static IBrowserFile? TryFindBrowserFile(
+        IReadOnlyDictionary<(string Name, long Size, long LastModifiedUtcMillis), IBrowserFile> index,
+        FileJSData jsFile)
+    {
+        var name = jsFile.name;
+        var size = jsFile.size;
+
+        var jsMillis = ParseUtcMillis(jsFile.lastModified);
+        if (jsMillis.HasValue)
+        {
+            var key = (name, size, jsMillis.Value);
+            if (index.TryGetValue(key, out var exact))
+            {
+                return exact;
+            }
+
+            foreach (var candidate in index)
+            {
+                if (!candidate.Key.Name.Equals(name, StringComparison.Ordinal) || candidate.Key.Size != size)
+                {
+                    continue;
+                }
+
+                if (Math.Abs(candidate.Key.LastModifiedUtcMillis - jsMillis.Value) <= 2000)
+                {
+                    return candidate.Value;
+                }
+            }
+        }
+
+        foreach (var candidate in index)
+        {
+            if (candidate.Key.Name.Equals(name, StringComparison.Ordinal) && candidate.Key.Size == size)
+            {
+                return candidate.Value;
+            }
+        }
+
+        return null;
+    }
+
+    private static long UtcMillis(DateTimeOffset dto) => dto.ToUniversalTime().ToUnixTimeMilliseconds();
+
+    private static long? ParseUtcMillis(string iso)
+    {
+        if (string.IsNullOrWhiteSpace(iso)) return null;
+        return DateTimeOffset.TryParse(iso, out var dto) ? dto.ToUniversalTime().ToUnixTimeMilliseconds() : null;
+    }
+
+    private List<FileTreeItem> BuildTree(List<FileJSData> jsFiles, IReadOnlyDictionary<string, IBrowserFile> browserFileByPath)
+    {
+        var root = new FileTreeItem { IsFolder = true, Name = "root", Path = "", Level = -1 };
 
         foreach (var jsFile in jsFiles)
         {
@@ -441,16 +605,20 @@
                 var child = current.Children.FirstOrDefault(c => c.Name == part);
                 if (child == null)
                 {
-                    child = new TreeItemData
+                    child = new FileTreeItem
                     {
                         Name = part,
                         Path = currentPath,
                         IsFolder = !isFile,
-                        IsSelected = true
+                        IsSelected = true,
+                        Level = current.Level + 1
                     };
                     if (isFile)
                     {
-                        child.BrowserFile = _browserFiles.FirstOrDefault(b => b.Name == jsFile.name && b.Size == jsFile.size);
+                        if (browserFileByPath.TryGetValue(jsFile.path, out var browserFile))
+                        {
+                            child.BrowserFile = browserFile;
+                        }
                     }
                     current.Children.Add(child);
                 }
@@ -460,19 +628,19 @@
         return root.Children.ToList();
     }
 
-    private List<TreeItemData> GetFilteredItems()
+    private List<FileTreeItem> GetFilteredItems()
     {
         if (string.IsNullOrWhiteSpace(_searchString))
         {
             SetAllVisible(TreeItems, true);
             return TreeItems;
         }
-        
+
         ApplyFilter(TreeItems, _searchString);
         return TreeItems;
     }
 
-    private void SetAllVisible(IEnumerable<TreeItemData> items, bool visible)
+    private void SetAllVisible(IEnumerable<FileTreeItem> items, bool visible)
     {
         foreach (var item in items)
         {
@@ -481,32 +649,44 @@
         }
     }
 
-    private bool ApplyFilter(IEnumerable<TreeItemData> items, string filter, bool parentMatched = false)
+    private bool ApplyFilter(IEnumerable<FileTreeItem> items, string filter, bool parentMatched = false)
     {
         bool anyVisible = false;
         foreach (var item in items)
         {
             bool matches = item.Name.Contains(filter, StringComparison.OrdinalIgnoreCase) || parentMatched;
             bool childrenVisible = ApplyFilter(item.Children, filter, matches);
-            
+
             item.Visible = matches || childrenVisible;
             if (item.Visible)
             {
                 anyVisible = true;
-                if (childrenVisible && !string.IsNullOrEmpty(filter) && !parentMatched) 
+                if (childrenVisible && !string.IsNullOrEmpty(filter) && !parentMatched)
                     item.IsExpanded = true;
             }
         }
         return anyVisible;
     }
 
-    private List<TreeItemData> GetSelectedFiles()
+    private List<FileTreeItem> GetSelectedFiles()
     {
-        var selected = new List<TreeItemData>();
-        void Traverse(IEnumerable<TreeItemData> items)
+        // Forzar actualización de visibilidad según el filtro actual antes de procesar la selección
+        if (string.IsNullOrWhiteSpace(_searchString))
+        {
+            SetAllVisible(TreeItems, true);
+        }
+        else
+        {
+            ApplyFilter(TreeItems, _searchString);
+        }
+
+        var selected = new List<FileTreeItem>();
+        void Traverse(IEnumerable<FileTreeItem> items)
         {
             foreach (var item in items)
             {
+                if (!item.Visible) continue;
+
                 if (!item.IsFolder && item.IsSelected == true)
                 {
                     selected.Add(item);
@@ -518,55 +698,253 @@
         return selected;
     }
 
-    private void RemoveFile(TreeItemData file)
+    private void RemoveFile(FileTreeItem file)
     {
         file.IsSelected = false;
         StateHasChanged();
     }
 
-    private void Cancelar()
+    private async Task Cancelar()
     {
         TreeItems.Clear();
         _browserFiles.Clear();
-        resultados.Clear();
-    }
+        _pendingJsFiles = null;
+        _browserFileByPath.Clear();
+        _previewResultados.Clear();
+        ExplorerState.Resultados.Clear();
+        ExplorerState.TreeItems.Clear();
+        ExplorerState.BrowserFiles.Clear();
+        ExplorerState.ArchivosSeleccionados.Clear();
+        logsProcesamiento.Clear();
+        procesando = false;
+        _searchString = "";
 
-    private List<RegistroContable> resultados = new();
+        await StatePersistence.LimpiarEstadoAsync();
+        await JS.InvokeVoidAsync("fileExplorer.resetInput", "folderInput");
+        await JS.InvokeVoidAsync("fileExplorer.resetInput", "filesInput");
+        await InvokeAsync(StateHasChanged);
+    }
 
     private async Task ProcesarSeleccion()
     {
-        var filesToProcess = GetSelectedFiles().Where(f => f.BrowserFile != null).ToList();
+        if (!MovimientosIntercompanyService.EsPeriodoValido(_periodo))
+        {
+            Ui.ShowInfo("Periodo inválido. Use formato YYYY-MM.");
+            return;
+        }
+
+        var selectedFiles = GetSelectedFiles();
+        var filesToProcess = selectedFiles.Where(f => f.BrowserFile != null).ToList();
         if (!filesToProcess.Any()) return;
 
-        resultados.Clear();
-        ProgressService.Inicializar(filesToProcess.Count);
-        
-        var config = await ConfigService.CargarConfiguracionAsync();
+        // Sincronizar con el estado global
+        ExplorerState.Resultados.Clear();
+        _previewResultados.Clear();
+        ExplorerState.Hallazgos.Clear();
+        ExplorerState.ArchivosSeleccionados = selectedFiles.Select(f => f.Path).ToList();
 
-        foreach (var fileItem in filesToProcess)
+        logsProcesamiento.Clear();
+        procesando = true;
+
+        // Forzar actualización inmediata de la UI para mostrar barra de progreso
+        await Task.Delay(1);
+        StateHasChanged();
+
+        // Suscribirse a los cambios del ProgressService
+        ProgressService.OnChange += ActualizarLogs;
+
+        ProgressService.Inicializar(filesToProcess.Count);
+        ProgressService.Log("INICIO: Iniciando procesamiento de archivos seleccionados", "Info");
+
+        try
         {
-            var file = fileItem.BrowserFile!;
-            ProgressService.Log($"Procesando {file.Name}", "Info");
-            
+            var config = await ConfigService.CargarConfiguracionAsync();
+
+            var registrosCrudos = new List<RegistroContable>();
+
+            foreach (var fileItem in filesToProcess)
+            {
+                var file = fileItem.BrowserFile!;
+                ProgressService.Log($"Iniciando extracción de: {file.Name}", "Info");
+
+                try
+                {
+                    using var stream = file.OpenReadStream(maxAllowedSize: 100 * 1024 * 1024);
+                    using var memoryStream = new MemoryStream();
+                    await stream.CopyToAsync(memoryStream);
+                    memoryStream.Position = 0;
+
+                    var res = await ExtractorEngine.ProcesarArchivoAsync(fileItem.Path, memoryStream, config, (msg) => ProgressService.Log(msg, "Info"));
+
+                    registrosCrudos.AddRange(res);
+                    _previewResultados.AddRange(res);
+
+                    ProgressService.Log($"FIN: Extracción exitosa para {file.Name}", "Success");
+                    ProgressService.Avanzar($"Completado: {file.Name}");
+                }
+                catch (Exception ex)
+                {
+                    ProgressService.Log($"ERROR en {file.Name}: {ex.Message}", "Error");
+                }
+            }
+
+            ExplorerState.Resultados = _previewResultados;
+
+            ProgressService.Log("NORMALIZACIÓN/AGRUPACIÓN: Preparando movimientos para Firestore.", "Info");
+            var movimientosCrudos = registrosCrudos.Select(r => new Movimiento
+            {
+                EmpresaOrigen = r.Empresa,
+                EmpresaContraparte = r.EmpresaContraparte,
+                Tipo = r.Tipo,
+                Cuenta = r.Cuenta,
+                Valor = r.Valor,
+                Nota = r.Nota,
+                Periodo = _periodo,
+            }).ToList();
+
+            var movimientosAgrupados = MovimientosIntercompanyService.NormalizarYAgrupar(movimientosCrudos, _periodo);
+            if (movimientosAgrupados.Any())
+            {
+                ExplorerState.Resultados = movimientosAgrupados.Select(m => new RegistroContable
+                {
+                    Empresa = m.EmpresaOrigen,
+                    EmpresaContraparte = m.EmpresaContraparte,
+                    Cuenta = m.Cuenta,
+                    Categoria = "INTERCOMPANY",
+                    Tipo = m.Tipo,
+                    Nota = string.Empty,
+                    Valor = m.Valor,
+                    ArchivoOrigen = "(agrupado)",
+                    HojaOrigen = string.Empty,
+                    TextoOrigen = m.EmpresaContraparte
+                }).ToList();
+            }
+
+            var functionsBaseUrl = (_functionsBaseUrl ?? string.Empty).Trim();
+            ExplorerState.FunctionsBaseUrl = functionsBaseUrl;
+
+            if (string.IsNullOrWhiteSpace(functionsBaseUrl))
+            {
+                Ui.ShowInfo("Configura FunctionsBaseUrl para subir a Firestore y generar cruces.");
+                ProgressService.Log("CONFIG: FunctionsBaseUrl vacío. No se ejecuta Motor 2 ni Motor 3.", "Error");
+                return;
+            }
+
+            if (!movimientosAgrupados.Any())
+            {
+                Ui.ShowInfo("No se generaron movimientos válidos para subir.");
+                ProgressService.Log("NORMALIZACIÓN/AGRUPACIÓN: Sin movimientos válidos para enviar.", "Warning");
+                return;
+            }
+
+            ProgressService.Log("MOTOR 2: Guardando movimientos en Firestore.", "Info");
+            foreach (var grupoEmpresa in movimientosAgrupados.GroupBy(m => m.EmpresaOrigen))
+            {
+                var empresa = grupoEmpresa.Key;
+                try
+                {
+                    var resp = await FirebaseMotors.GuardarMovimientosAsync(functionsBaseUrl, empresa, _periodo, grupoEmpresa.ToList());
+                    ProgressService.Log($"MOTOR 2 OK ({empresa}): insertados={resp.Insertados}, duplicados={resp.Duplicados}, errores={resp.Errores}", resp.Errores > 0 ? "Warning" : "Success");
+                }
+                catch (Exception ex)
+                {
+                    ProgressService.Log($"MOTOR 2 ERROR ({empresa}): {ex.Message}", "Error");
+                    Ui.ShowError(ex, "Motor 2 falló. No se ejecuta Motor 3.");
+                    return;
+                }
+            }
+
+            ProgressService.Log("MOTOR 3: Ejecutando cruce intercompany en backend.", "Info");
             try
             {
-                using var stream = file.OpenReadStream(maxAllowedSize: 100 * 1024 * 1024);
-                using var memoryStream = new MemoryStream();
-                await stream.CopyToAsync(memoryStream);
-                memoryStream.Position = 0;
-
-                var res = await ExtractorEngine.ProcesarArchivoAsync(fileItem.Path, memoryStream, config, (msg) => ProgressService.Log(msg, "Info"));
-                resultados.AddRange(res);
-                
-                ProgressService.Avanzar($"Completado: {file.Name}");
+                var cruce = await FirebaseMotors.CruzarAsync(functionsBaseUrl, _periodo, _tolerancia);
+                ProgressService.Log($"MOTOR 3 OK: ok={cruce.Ok}, descuadre={cruce.Descuadre}, pares={cruce.ParesEvaluados}", cruce.Descuadre > 0 ? "Warning" : "Success");
+                if (cruce.Descuadre > 0) Ui.ShowInfo($"Cruce generado. OK={cruce.Ok}, DESCUADRE={cruce.Descuadre}.");
+                else Ui.ShowSuccess($"Cruce generado. OK={cruce.Ok}.");
             }
             catch (Exception ex)
             {
-                ProgressService.Log($"Error en {file.Name}: {ex.Message}", "Error");
+                ProgressService.Log($"MOTOR 3 ERROR: {ex.Message}", "Error");
+                Ui.ShowError(ex, "Motor 3 falló.");
             }
+
+            ProgressService.Log("FIN GLOBAL: Proceso finalizado correctamente.", "Success");
+
+            // Persistir el estado para que se mantenga al navegar
+            await StatePersistence.GuardarEstadoAsync(new Imbalances.Client.Services.PersistenceState
+            {
+                FunctionsBaseUrl = ExplorerState.FunctionsBaseUrl,
+                Resultados = ExplorerState.Resultados,
+                ArchivosSeleccionados = ExplorerState.ArchivosSeleccionados,
+                ArchivosProcesados = ExplorerState.ArchivosProcesados
+            });
+        }
+        catch (Exception globalEx)
+        {
+            ProgressService.Log($"ERROR GLOBAL: Fallo inesperado en el procesamiento. {globalEx.Message}", "Error");
+        }
+        finally
+        {
+            ProgressService.OnChange -= ActualizarLogs;
+            procesando = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void ActualizarLogs()
+    {
+        var estado = ProgressService.ObtenerEstado();
+        logsProcesamiento = estado.Logs.ToList();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private string GetLogCssClass(string estado)
+    {
+        return estado.ToLower() switch
+        {
+            "info" => "log-info",
+            "success" => "log-success",
+            "error" => "log-error",
+            "warning" => "log-warning",
+            _ => "log-info"
+        };
+    }
+
+    private async Task ExportarLog()
+    {
+        if (!logsProcesamiento.Any()) return;
+
+        var estado = ProgressService.ObtenerEstado();
+        var fechaGeneracion = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+
+        var contenido = new StringBuilder();
+        contenido.AppendLine("IMBALANCES - LOG DE PROCESAMIENTO");
+        contenido.AppendLine($"Generado: {fechaGeneracion}");
+        contenido.AppendLine($"Etapa actual: {estado.EtapaActual}");
+        contenido.AppendLine($"Archivo de Excel: {estado.CurrentStep}/{estado.TotalSteps}");
+        contenido.AppendLine(new string('-', 80));
+
+        foreach (var log in logsProcesamiento)
+        {
+            contenido.AppendLine($"[{log.Timestamp:yyyy-MM-dd HH:mm:ss}] [{log.Estado}] {log.Mensaje}");
         }
 
-        ProgressService.Log("Proceso finalizado.", "Success");
-        StateHasChanged();
+        var bytes = Encoding.UTF8.GetBytes(contenido.ToString());
+        var base64 = Convert.ToBase64String(bytes);
+        await JS.InvokeVoidAsync("eval", $"const a = document.createElement('a'); a.href = 'data:text/plain;base64,{base64}'; a.download = 'imbalances_log_{DateTime.Now:yyyyMMdd_HHmmss}.txt'; a.click();");
+    }
+
+    private double GetProgressValue()
+    {
+        var estado = ProgressService.ObtenerEstado();
+        if (estado.TotalSteps == 0) return 0;
+        return (double)estado.CurrentStep / estado.TotalSteps * 100;
+    }
+
+    private string GetProgressText()
+    {
+        var estado = ProgressService.ObtenerEstado();
+        if (estado.TotalSteps == 0) return "Inicializando...";
+        return $"Archivo {estado.CurrentStep} de {estado.TotalSteps} - {estado.EtapaActual}";
     }
 }

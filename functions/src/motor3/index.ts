@@ -1,0 +1,2 @@
+export { cruzar } from "./cruceIntercompany";
+

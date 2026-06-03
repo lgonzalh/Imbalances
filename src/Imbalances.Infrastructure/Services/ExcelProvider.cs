@@ -37,7 +37,7 @@ public class ExcelWorkbookWrapper : IExcelWorkbook
 
     public IEnumerable<IExcelWorksheet> Worksheets => _dataSet.Tables.Cast<DataTable>().Select(t => new ExcelWorksheetWrapper(t));
 
-    public IExcelWorksheet GetWorksheet(string name)
+    public IExcelWorksheet? GetWorksheet(string name)
     {
         var table = _dataSet.Tables[name];
         return table != null ? new ExcelWorksheetWrapper(table) : null;
@@ -54,6 +54,17 @@ public class ExcelWorksheetWrapper : IExcelWorksheet
     }
 
     public string Name => _table.TableName;
+
+    public int RowCount => _table.Rows.Count;
+
+    public IExcelRow? GetRow(int rowNumber)
+    {
+        var index = rowNumber - 1;
+        if (index < 0 || index >= _table.Rows.Count)
+            return null;
+
+        return new ExcelRowWrapper(_table.Rows[index]);
+    }
 
     public IEnumerable<IExcelRow> Rows => _table.Rows.Cast<DataRow>().Select(r => new ExcelRowWrapper(r));
 }

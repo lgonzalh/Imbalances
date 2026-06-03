@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Imbalances.Client/Imbalances.Client.csproj" />
+    <Project Path="src/Imbalances.Core/Imbalances.Core.csproj" />
+    <Project Path="src/Imbalances.Infrastructure/Imbalances.Infrastructure.csproj" />
+    <Project Path="src/Imbalances.Tests/Imbalances.Tests.csproj" />
+    <Project Path="src/Imbalances.Tools.SeedFirestore/Imbalances.Tools.SeedFirestore.csproj" />
+  </Folder>
+</Solution>

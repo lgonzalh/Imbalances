@@ -1,0 +1,40 @@
+.app-progress {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.app-progress__text {
+    margin-top: 8px;
+    font-weight: 800;
+    color: var(--color-primary);
+}
+
+.app-progress__log {
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    border-radius: 12px;
+    padding: 12px;
+}
+
+.app-progress__log-list {
+    max-height: 220px;
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.app-progress__log-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.app-progress__log-text {
+    color: var(--color-secondary-contrast);
+    line-height: 1.35;
+    word-break: break-word;
+    font-size: 0.8rem;
+}
+

@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Imbalances.Core.Models;
 
@@ -10,104 +9,49 @@ namespace Imbalances.Core.Services;
 
 public class ExtractorEngine : IExtractorEngine
 {
-    private readonly IExcelProvider _excelProvider;
+    private readonly IMotor1Extractor _motor1;
 
-    public ExtractorEngine(IExcelProvider excelProvider)
+    public ExtractorEngine(IMotor1Extractor motor1)
     {
-        _excelProvider = excelProvider;
+        _motor1 = motor1;
     }
 
-    public async Task<List<RegistroContable>> ProcesarArchivoAsync(string filePath, Stream fileStream, ConfiguracionCore config)
+    public async Task<List<RegistroContable>> ProcesarArchivoAsync(string filePath, Stream fileStream, ConfiguracionCore config, Action<string>? onProgressLog = null)
     {
-        var resultados = new List<RegistroContable>();
-
-        var empresa = config.Empresas.FirstOrDefault(e => Regex.IsMatch(filePath, e.CarpetaRegex, RegexOptions.IgnoreCase));
-        if (empresa == null) return resultados;
-
-        var workbook = await _excelProvider.OpenAsync(fileStream);
-        var balance = workbook.GetWorksheet(empresa.HojaBalance);
-        if (balance == null) return resultados;
-
-        var listaNotasDetectadas = new HashSet<string>();
-
-        foreach (var row in balance.Rows)
+        var nombreArchivo = Path.GetFileName(filePath);
+        var movimientos = await ProcesarArchivoMotor1Async(filePath, fileStream, config, periodo: string.Empty, onProgressLog);
+        var resultados = movimientos.Select(m => new RegistroContable
         {
-            var nota = row.GetCell("J");
-            if (!string.IsNullOrWhiteSpace(nota))
-            {
-                listaNotasDetectadas.Add(nota.Trim());
-            }
-        }
-
-        foreach (var notaDetectada in listaNotasDetectadas)
-        {
-            var notaConfig = config.Notas.FirstOrDefault(n => n.Nota == notaDetectada);
-            if (notaConfig == null) continue;
-
-            var hojaNota = workbook.GetWorksheet(notaConfig.NombreHoja);
-            if (hojaNota == null) continue;
-
-            foreach (var eq in config.Equivalencias)
-            {
-                if (!eq.NotasPermitidas.Contains(notaDetectada)) continue;
-
-                var fila = hojaNota.Rows.FirstOrDefault(r =>
-                    eq.AliasTexto.Any(alias =>
-                        r.Texto.Contains(alias, StringComparison.OrdinalIgnoreCase)));
-
-                if (fila != null)
-                {
-                    var valorStr = fila.GetCell(eq.ColumnaValor);
-                    var valor = ParseDecimal(valorStr);
-
-                    resultados.Add(new RegistroContable
-                    {
-                        Empresa = empresa.Nombre,
-                        Cuenta = eq.CuentaCanonica,
-                        Categoria = eq.Categoria,
-                        Tipo = eq.Tipo,
-                        Nota = notaDetectada,
-                        Valor = valor
-                    });
-                }
-            }
-        }
+            Empresa = m.EmpresaOrigen,
+            EmpresaContraparte = m.EmpresaContraparte,
+            Cuenta = m.Cuenta,
+            Categoria = m.Tipo,
+            Tipo = m.Tipo,
+            Nota = m.Nota,
+            Valor = m.Valor,
+            ArchivoOrigen = nombreArchivo,
+            HojaOrigen = string.IsNullOrWhiteSpace(m.Nota) ? string.Empty : $"Nota {m.Nota}",
+            TextoOrigen = m.EmpresaContraparte
+        }).ToList();
 
         return resultados;
+
     }
 
-    private decimal ParseDecimal(string value)
+    public async Task<List<Movimiento>> ProcesarArchivoMotor1Async(string filePath, Stream fileStream, ConfiguracionCore config, string periodo = "", Action<string>? onProgressLog = null)
     {
-        if (string.IsNullOrWhiteSpace(value)) return 0;
-        value = value.Replace(".", "").Replace(",", ".");
-        if (decimal.TryParse(value, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out decimal result))
-        {
-            return result;
-        }
-        return 0;
+        return await _motor1.ExtraerAsync(filePath, fileStream, config, periodo, onProgressLog);
     }
 
     public IEnumerable<object> Consolidar(List<RegistroContable> resultados)
     {
-        return resultados
-            .GroupBy(x => new { x.Empresa, x.Cuenta })
-            .Select(g => new {
-                g.Key.Empresa,
-                g.Key.Cuenta,
-                Valor = g.Sum(x => x.Valor)
-            });
+        return resultados.GroupBy(x => new { x.Empresa, x.Cuenta, x.Tipo, x.Nota })
+            .Select(g => new { g.Key.Empresa, g.Key.Cuenta, g.Key.Tipo, g.Key.Nota, Valor = g.Sum(x => x.Valor) });
     }
 
     public IEnumerable<object> Conciliar(List<RegistroContable> resultados)
     {
-        var cxc = resultados.Where(x => x.Categoria == "CxC");
-        var cxp = resultados.Where(x => x.Categoria == "CxP");
-
-        return from a in cxc
-               join b in cxp on a.Empresa equals b.Empresa
-               select new {
-                   a.Empresa,
-                   Diferencia = a.Valor - b.Valor
-               };
+        return resultados.GroupBy(x => new { x.Empresa, x.Tipo })
+            .Select(g => new { g.Key.Empresa, g.Key.Tipo, Total = g.Sum(x => x.Valor) });
     }
 }
