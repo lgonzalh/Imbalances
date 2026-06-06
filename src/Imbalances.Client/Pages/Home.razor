@@ -141,7 +141,7 @@
             {
                 <div class="panel-section">
                     <div class="panel-section-header">LOG</div>
-                    <div class="log-container">
+                    <div class="log-container" id="home-log-container">
                         @foreach (var log in logsProcesamiento)
                         {
                             <div class="log-entry @GetLogCssClass(log.Estado)">
@@ -154,9 +154,9 @@
                 </div>
             }
             <div class="panel-footer">
-                <MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="Cancelar" Class="footer-btn">Limpiar</MudButton>
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ProcesarSeleccion" Disabled="@(!GetSelectedFiles().Any())" Class="footer-btn confirm-btn px-8">
-                    Iniciar
+                <MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="Cancelar" Disabled="@ExplorerState.IsProcessing" Class="footer-btn">Limpiar</MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ProcesarSeleccion" Disabled="@(!GetSelectedFiles().Any() || ExplorerState.IsProcessing)" Class="footer-btn confirm-btn px-8">
+                    @(ExplorerState.IsProcessing ? "Procesando..." : "Iniciar")
                 </MudButton>
             </div>
         </div>
@@ -438,9 +438,14 @@
 
 @code {
     private List<IBrowserFile> _browserFiles = new();
-    private List<FileTreeItem> TreeItems { get; set; } = new();
+    private List<FileTreeItem> TreeItems
+    {
+        get => ExplorerState.TreeItems;
+        set => ExplorerState.TreeItems = value;
+    }
     private string _searchString = "";
     private List<LogProceso> logsProcesamiento = new();
+    private bool _scrollToBottom;
     private bool procesando = false;
     private List<FileJSData>? _pendingJsFiles;
     private Dictionary<string, IBrowserFile> _browserFileByPath = new(StringComparer.OrdinalIgnoreCase);
@@ -451,13 +456,44 @@
 
     private DotNetObjectReference<Home>? _objRef;
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
         _objRef = DotNetObjectReference.Create(this);
         _functionsBaseUrl = ExplorerState.FunctionsBaseUrl;
         if (string.IsNullOrWhiteSpace(_functionsBaseUrl))
         {
             _functionsBaseUrl = Configuration["Firebase:FunctionsBaseUrl"] ?? string.Empty;
+        }
+
+        if (!ExplorerState.TreeItems.Any() && !ExplorerState.Resultados.Any())
+        {
+            var savedState = await StatePersistence.CargarEstadoAsync();
+            if (savedState != null && savedState.TreeItems.Any())
+            {
+                Console.WriteLine($"[Persistencia] Home: restaurando desde IndexedDB - TreeItems: {savedState.TreeItems.Count}, Resultados: {savedState.Resultados.Count}, Hallazgos: {savedState.Hallazgos.Count}, Reciprocidades: {savedState.Reciprocidades.Count}");
+                ExplorerState.TreeItems = savedState.TreeItems;
+                ExplorerState.Resultados = savedState.Resultados;
+                ExplorerState.Hallazgos = savedState.Hallazgos;
+                ExplorerState.DocumentosVerificados = savedState.DocumentosVerificados;
+                ExplorerState.Reciprocidades = savedState.Reciprocidades;
+                ExplorerState.EstadosHallazgos = savedState.EstadosHallazgos;
+                ExplorerState.ArchivosProcesados = savedState.ArchivosProcesados;
+                ExplorerState.ArchivosSeleccionados = savedState.ArchivosSeleccionados;
+                logsProcesamiento = savedState.Logs ?? new();
+            }
+
+            if (!logsProcesamiento.Any())
+            {
+                var progreso = ProgressService.ObtenerEstado();
+                if (progreso.Logs.Any())
+                {
+                    logsProcesamiento = progreso.Logs.ToList();
+                }
+            }
+        }
+        else
+        {
+            Console.WriteLine($"[Explorador] Estado vivo en memoria - TreeItems: {ExplorerState.TreeItems.Count}, Resultados: {ExplorerState.Resultados.Count}");
         }
     }
 
@@ -467,6 +503,12 @@
         {
             await JS.InvokeVoidAsync("fileExplorer.getFiles", "folderInput", _objRef);
             await JS.InvokeVoidAsync("fileExplorer.getFiles", "filesInput", _objRef);
+        }
+
+        if (_scrollToBottom)
+        {
+            _scrollToBottom = false;
+            await JS.InvokeVoidAsync("fileExplorer.scrollToBottom", "home-log-container");
         }
     }
 
@@ -514,7 +556,7 @@
 
         _browserFileByPath = BuildBrowserFileMap(_pendingJsFiles, _browserFiles);
         TreeItems = BuildTree(_pendingJsFiles, _browserFileByPath);
-        ExplorerState.TreeItems = TreeItems;
+        // TreeItems already delegates to ExplorerState.TreeItems
         ExplorerState.BrowserFiles = _browserFiles;
     }
 
@@ -711,10 +753,7 @@
         _pendingJsFiles = null;
         _browserFileByPath.Clear();
         _previewResultados.Clear();
-        ExplorerState.Resultados.Clear();
-        ExplorerState.TreeItems.Clear();
-        ExplorerState.BrowserFiles.Clear();
-        ExplorerState.ArchivosSeleccionados.Clear();
+        ExplorerState.Clear();
         logsProcesamiento.Clear();
         procesando = false;
         _searchString = "";
@@ -744,6 +783,7 @@
         ExplorerState.ArchivosSeleccionados = selectedFiles.Select(f => f.Path).ToList();
 
         logsProcesamiento.Clear();
+        ExplorerState.IsProcessing = true;
         procesando = true;
 
         // Forzar actualización inmediata de la UI para mostrar barra de progreso
@@ -870,13 +910,20 @@
 
             ProgressService.Log("FIN GLOBAL: Proceso finalizado correctamente.", "Success");
 
-            // Persistir el estado para que se mantenga al navegar
+            // Persistir el estado completo para que se mantenga al navegar
+            Console.WriteLine($"[Persistencia] Home: guardando estado - TreeItems: {ExplorerState.TreeItems.Count}, Resultados: {ExplorerState.Resultados.Count}, Hallazgos: {ExplorerState.Hallazgos.Count}, Reciprocidades: {ExplorerState.Reciprocidades.Count}");
             await StatePersistence.GuardarEstadoAsync(new Imbalances.Client.Services.PersistenceState
             {
                 FunctionsBaseUrl = ExplorerState.FunctionsBaseUrl,
                 Resultados = ExplorerState.Resultados,
+                Hallazgos = ExplorerState.Hallazgos,
+                DocumentosVerificados = ExplorerState.DocumentosVerificados,
+                Reciprocidades = ExplorerState.Reciprocidades,
+                EstadosHallazgos = ExplorerState.EstadosHallazgos,
+                ArchivosProcesados = ExplorerState.ArchivosProcesados,
                 ArchivosSeleccionados = ExplorerState.ArchivosSeleccionados,
-                ArchivosProcesados = ExplorerState.ArchivosProcesados
+                TreeItems = ExplorerState.TreeItems,
+                Logs = logsProcesamiento
             });
         }
         catch (Exception globalEx)
@@ -886,6 +933,7 @@
         finally
         {
             ProgressService.OnChange -= ActualizarLogs;
+            ExplorerState.IsProcessing = false;
             procesando = false;
             await InvokeAsync(StateHasChanged);
         }
@@ -895,6 +943,7 @@
     {
         var estado = ProgressService.ObtenerEstado();
         logsProcesamiento = estado.Logs.ToList();
+        _scrollToBottom = true;
         InvokeAsync(StateHasChanged);
     }
 
@@ -945,6 +994,8 @@
     {
         var estado = ProgressService.ObtenerEstado();
         if (estado.TotalSteps == 0) return "Inicializando...";
-        return $"Archivo {estado.CurrentStep} de {estado.TotalSteps} - {estado.EtapaActual}";
+        return $"Archivo {Math.Max(1, estado.CurrentStep)} de {estado.TotalSteps} - {estado.EtapaActual}";
     }
 }
+
+

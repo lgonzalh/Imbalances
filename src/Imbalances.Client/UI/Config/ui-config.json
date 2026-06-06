@@ -26,11 +26,13 @@
     "config": {
       "toolbar": {
         "actions": [
-          { "id": "export", "label": "Exportar", "variant": "secondary" },
-          { "id": "import", "label": "Importar", "variant": "secondary", "filePicker": true, "accept": ".xlsx", "multiple": false },
+          { "id": "addEmpresa", "label": "Agregar empresa", "variant": "secondary" },
+          { "id": "addCuenta", "label": "Agregar cuenta", "variant": "secondary" },
+          { "id": "export", "label": "Descargar", "variant": "secondary" },
+          { "id": "import", "label": "Subir", "variant": "secondary", "filePicker": true, "accept": ".xlsx", "multiple": false },
           { "id": "log", "label": "Log", "variant": "secondary" },
-          { "id": "delete", "label": "Eliminar", "variant": "danger" },
-          { "id": "save", "label": "Guardar", "variant": "primary" }
+          { "id": "delete", "label": "Eliminar seleccionados", "variant": "danger" },
+          { "id": "save", "label": "Guardar cambios", "variant": "primary" }
         ]
       }
     },

@@ -1,0 +1,413 @@
+@page "/admin"
+@inject Imbalances.Client.Services.FirebaseAdminService AdminService
+@inject Imbalances.Client.Services.UiFeedbackService Ui
+@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
+@using Imbalances.Client.Services
+@using System.Text.Json
+
+<PageTitle>Imbalances - Administración</PageTitle>
+
+<div class="admin-container">
+    <div class="admin-header">
+        <h1>Panel de Administración</h1>
+        <p class="admin-warning">Esta página es solo para administradores. Los cambios son irreversibles.</p>
+    </div>
+
+    @if (!string.IsNullOrEmpty(_errorConexion))
+    {
+        <div class="admin-card admin-error-card">
+            <h2>Error de Conexión</h2>
+            <p class="error-message">@_errorConexion</p>
+            <button class="app-btn btn-primary" @onclick="CargarColecciones">
+                Reintentar Conexión
+            </button>
+        </div>
+    }
+
+    <div class="admin-content">
+        <!-- Selector de Colección -->
+        <div class="admin-card">
+            <h2>Seleccionar Colección</h2>
+            <div class="admin-form-group">
+                <label>Colección:</label>
+                <input type="text" 
+                       class="app-input" 
+                       @bind="_coleccionManual" 
+                       @bind:event="oninput"
+                       placeholder="Ingrese el nombre de la colección (ej: 2026-05)" />
+                <select class="app-select" @bind="_coleccionSeleccionada" @bind:after="CargarDocumentos">
+                    <option value="">-- Seleccione una colección --</option>
+                    @foreach (var col in _colecciones)
+                    {
+                        <option value="@col">@col</option>
+                    }
+                </select>
+                <button class="app-btn btn-secondary" @onclick="CargarColecciones" disabled="@_cargando">
+                    Actualizar Lista
+                </button>
+                <button class="app-btn btn-primary" @onclick="UsarColeccionManual" disabled="@(string.IsNullOrWhiteSpace(_coleccionManual) || _cargando)">
+                    Cargar Colección
+                </button>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrEmpty(_coleccionSeleccionada) || _mostrarInterfazCompleta)
+        {
+            <!-- Lista de Documentos -->
+            <div class="admin-card">
+                <div class="admin-card-header">
+                    <h2>Documentos en "@(_coleccionSeleccionada ?? "Colección")"</h2>
+                    <div class="admin-actions">
+                        <span class="admin-count">Total: @_documentos.Count documentos</span>
+                        @if (_documentos.Count > 0)
+                        {
+                            <button class="app-btn btn-danger" @onclick="LimpiarColeccionCompleta" disabled="@_cargando">
+                                Limpiar Toda la Colección
+                            </button>
+                        }
+                    </div>
+                </div>
+
+                @if (_cargando)
+                {
+                    <div class="admin-loading">
+                        <div class="spinner"></div>
+                        <p>Cargando...</p>
+                    </div>
+                }
+                else if (_documentos.Count == 0)
+                {
+                    <div class="admin-empty">
+                        <p>No hay documentos en esta colección.</p>
+                    </div>
+                }
+                else
+                {
+                    <div class="admin-table-container">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 40px;">
+                                        <input type="checkbox" 
+                                               @bind="_seleccionarTodos" 
+                                               @bind:after="ToggleSeleccionarTodos" />
+                                    </th>
+                                    <th>ID Documento</th>
+                                    <th>Vista Previa</th>
+                                    <th style="width: 100px;">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var doc in _documentos)
+                                {
+                                    <tr class="@(EstaSeleccionado(doc.Id) ? "selected" : "")">
+                                        <td>
+                                            <input type="checkbox" 
+                                                   checked="@EstaSeleccionado(doc.Id)"
+                                                   @onchange="() => ToggleSeleccion(doc.Id)" />
+                                        </td>
+                                        <td class="doc-id">@doc.Id</td>
+                                        <td class="doc-preview">
+                                            <details>
+                                                <summary>@doc.Preview</summary>
+                                                <pre>@FormatearJson(doc.Data)</pre>
+                                            </details>
+                                        </td>
+                                        <td>
+                                            <button class="app-btn btn-danger btn-sm" 
+                                                    @onclick="() => EliminarDocumento(doc.Id)"
+                                                    disabled="@_cargando">
+                                                Eliminar
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+
+                    @if (_documentosSeleccionados.Count > 0)
+                    {
+                        <div class="admin-bulk-actions">
+                            <span>@_documentosSeleccionados.Count documento(s) seleccionado(s)</span>
+                            <button class="app-btn btn-danger" @onclick="EliminarSeleccionados" disabled="@_cargando">
+                                Eliminar Seleccionados
+                            </button>
+                        </div>
+                    }
+                }
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private List<string> _colecciones = new();
+    private string _coleccionSeleccionada = string.Empty;
+    private string _coleccionManual = string.Empty;
+    private List<FirebaseAdminService.DocumentoFirestore> _documentos = new();
+    private HashSet<string> _documentosSeleccionados = new();
+    private bool _seleccionarTodos = false;
+    private bool _cargando = false;
+    private string _errorConexion = string.Empty;
+    private bool _mostrarInterfazCompleta = true; // Siempre mostrar la interfaz
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Cargar colecciones comunes por defecto
+        _colecciones = new List<string>
+        {
+            "2026-05",
+            "2026-04",
+            "2026-03",
+            "2026-02",
+            "2026-01",
+            "2025-12",
+            "resultados",
+            "configuracion"
+        };
+        
+        await CargarColecciones();
+    }
+
+    private async Task UsarColeccionManual()
+    {
+        if (string.IsNullOrWhiteSpace(_coleccionManual)) return;
+        
+        _coleccionSeleccionada = _coleccionManual.Trim();
+        await CargarDocumentos();
+    }
+
+    private async Task CargarColecciones()
+    {
+        _cargando = true;
+        _errorConexion = string.Empty;
+        try
+        {
+            var functionsBaseUrl = Configuration["Firebase:FunctionsBaseUrl"] ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(functionsBaseUrl))
+            {
+                _errorConexion = "No hay FunctionsBaseUrl configurada en appsettings.json";
+                Ui.ShowWarning("Usando colecciones predeterminadas. Configure Firebase para ver las colecciones reales.");
+                return;
+            }
+
+            var coleccionesFirebase = await AdminService.ObtenerColeccionesAsync(functionsBaseUrl);
+
+            if (coleccionesFirebase.Count > 0)
+            {
+                // Combinar colecciones de Firebase con las predeterminadas
+                _colecciones = coleccionesFirebase.Union(_colecciones).Distinct().OrderByDescending(x => x).ToList();
+                Ui.ShowSuccess($"Se cargaron {coleccionesFirebase.Count} colecciones desde Firebase.");
+            }
+            else
+            {
+                _errorConexion = "No se encontraron colecciones en Firebase. Usando colecciones predeterminadas.";
+                Ui.ShowWarning(_errorConexion);
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorConexion = $"Error al conectar con Firebase: {ex.Message}. Usando colecciones predeterminadas.";
+            Ui.ShowWarning("No se pudo conectar con Firebase. Puede ingresar el nombre de la colección manualmente.");
+            Console.WriteLine($"Error detallado: {ex}");
+        }
+        finally
+        {
+            _cargando = false;
+        }
+    }
+
+    private async Task CargarDocumentos()
+    {
+        if (string.IsNullOrEmpty(_coleccionSeleccionada))
+        {
+            _documentos.Clear();
+            _documentosSeleccionados.Clear();
+            _seleccionarTodos = false;
+            return;
+        }
+
+        _cargando = true;
+        try
+        {
+            var functionsBaseUrl = Configuration["Firebase:FunctionsBaseUrl"] ?? string.Empty;
+            _documentos = await AdminService.ObtenerDocumentosAsync(functionsBaseUrl, _coleccionSeleccionada, 500);
+            _documentosSeleccionados.Clear();
+            _seleccionarTodos = false;
+            
+            Ui.ShowSuccess($"Cargados {_documentos.Count} documentos.");
+        }
+        catch (Exception ex)
+        {
+            Ui.ShowError(ex, "Error al cargar documentos.");
+        }
+        finally
+        {
+            _cargando = false;
+        }
+    }
+
+    private bool EstaSeleccionado(string docId) => _documentosSeleccionados.Contains(docId);
+
+    private void ToggleSeleccion(string docId)
+    {
+        if (_documentosSeleccionados.Contains(docId))
+        {
+            _documentosSeleccionados.Remove(docId);
+        }
+        else
+        {
+            _documentosSeleccionados.Add(docId);
+        }
+        
+        _seleccionarTodos = _documentosSeleccionados.Count == _documentos.Count;
+    }
+
+    private void ToggleSeleccionarTodos()
+    {
+        if (_seleccionarTodos)
+        {
+            _documentosSeleccionados = _documentos.Select(d => d.Id).ToHashSet();
+        }
+        else
+        {
+            _documentosSeleccionados.Clear();
+        }
+    }
+
+    private async Task EliminarDocumento(string docId)
+    {
+        var ok = await Ui.ConfirmAsync(
+            "Eliminar documento",
+            $"¿Está seguro de eliminar el documento '{docId}'? Esta acción no se puede deshacer.");
+        
+        if (!ok) return;
+
+        _cargando = true;
+        try
+        {
+            var functionsBaseUrl = Configuration["Firebase:FunctionsBaseUrl"] ?? string.Empty;
+            var result = await AdminService.EliminarDocumentosAsync(
+                functionsBaseUrl, 
+                _coleccionSeleccionada, 
+                new List<string> { docId });
+
+            if (result.Eliminados > 0)
+            {
+                Ui.ShowSuccess($"Documento eliminado correctamente.");
+                await CargarDocumentos();
+            }
+            else
+            {
+                Ui.ShowError("No se pudo eliminar el documento.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Ui.ShowError(ex, "Error al eliminar documento.");
+        }
+        finally
+        {
+            _cargando = false;
+        }
+    }
+
+    private async Task EliminarSeleccionados()
+    {
+        if (_documentosSeleccionados.Count == 0)
+        {
+            Ui.ShowWarning("No hay documentos seleccionados.");
+            return;
+        }
+
+        var ok = await Ui.ConfirmAsync(
+            "Eliminar documentos",
+            $"¿Está seguro de eliminar {_documentosSeleccionados.Count} documento(s)? Esta acción no se puede deshacer.");
+        
+        if (!ok) return;
+
+        _cargando = true;
+        try
+        {
+            var functionsBaseUrl = Configuration["Firebase:FunctionsBaseUrl"] ?? string.Empty;
+            var result = await AdminService.EliminarDocumentosAsync(
+                functionsBaseUrl, 
+                _coleccionSeleccionada, 
+                _documentosSeleccionados.ToList());
+
+            Ui.ShowSuccess($"Eliminados {result.Eliminados} documento(s).");
+            
+            if (result.Errores > 0)
+            {
+                Ui.ShowWarning($"Errores: {result.Errores}");
+            }
+
+            await CargarDocumentos();
+        }
+        catch (Exception ex)
+        {
+            Ui.ShowError(ex, "Error al eliminar documentos.");
+        }
+        finally
+        {
+            _cargando = false;
+        }
+    }
+
+    private async Task LimpiarColeccionCompleta()
+    {
+        var ok = await Ui.ConfirmAsync(
+            "⚠️ LIMPIAR COLECCIÓN COMPLETA",
+            $"¿Está COMPLETAMENTE SEGURO de eliminar TODOS los documentos de '{_coleccionSeleccionada}'? " +
+            $"Esta acción eliminará {_documentos.Count} documento(s) y NO SE PUEDE DESHACER.");
+        
+        if (!ok) return;
+
+        // Doble confirmación para operaciones peligrosas
+        var confirmacion = await Ui.ConfirmAsync(
+            "Confirmación Final",
+            "Esta es su última oportunidad. ¿Realmente desea continuar?");
+        
+        if (!confirmacion) return;
+
+        _cargando = true;
+        try
+        {
+            var functionsBaseUrl = Configuration["Firebase:FunctionsBaseUrl"] ?? string.Empty;
+            var result = await AdminService.LimpiarColeccionAsync(functionsBaseUrl, _coleccionSeleccionada);
+
+            Ui.ShowSuccess($"Colección limpiada. Eliminados: {result.Eliminados} documento(s).");
+            
+            if (result.Errores > 0)
+            {
+                Ui.ShowWarning($"Errores: {result.Errores}");
+            }
+
+            await CargarDocumentos();
+        }
+        catch (Exception ex)
+        {
+            Ui.ShowError(ex, "Error al limpiar colección.");
+        }
+        finally
+        {
+            _cargando = false;
+        }
+    }
+
+    private string FormatearJson(JsonElement data)
+    {
+        try
+        {
+            return JsonSerializer.Serialize(data, new JsonSerializerOptions 
+            { 
+                WriteIndented = true 
+            });
+        }
+        catch
+        {
+            return data.ToString();
+        }
+    }
+}

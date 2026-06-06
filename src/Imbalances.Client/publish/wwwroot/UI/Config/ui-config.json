@@ -1,0 +1,103 @@
+{
+    "layout": {
+        "toolbarPosition": "top",
+        "toolbarSticky": false,
+        "toolbarBottomOffset": 16
+    },
+    "grid": {
+        "scrollHorizontal": true,
+        "resizableColumns": true,
+        "minColumnWidth": 120
+    },
+    "card": {
+        "collapsible": true,
+        "defaultExpanded": true
+    },
+    "toolbar": {
+        "showAdd": true,
+        "showDelete": true,
+        "showSave": true,
+        "showImport": true,
+        "showExport": true,
+        "showLog": true
+    },
+    "pages": {
+        "config": {
+            "toolbar": {
+                "actions": [
+                    {
+                        "id": "addEmpresa",
+                        "label": "Agregar empresa",
+                        "variant": "secondary"
+                    },
+                    {
+                        "id": "addCuenta",
+                        "label": "Agregar cuenta",
+                        "variant": "secondary"
+                    },
+                    {
+                        "id": "export",
+                        "label": "Descargar",
+                        "variant": "secondary"
+                    },
+                    {
+                        "id": "import",
+                        "label": "Subir",
+                        "variant": "secondary",
+                        "filePicker": true,
+                        "accept": ".xlsx"
+                    },
+                    { "id": "log", "label": "Log", "variant": "secondary" },
+                    {
+                        "id": "delete",
+                        "label": "Eliminar seleccionados",
+                        "variant": "danger"
+                    },
+                    {
+                        "id": "save",
+                        "label": "Guardar cambios",
+                        "variant": "primary"
+                    }
+                ]
+            }
+        },
+        "explorer": {
+            "toolbar": {
+                "actions": [
+                    {
+                        "id": "loadFolder",
+                        "label": "Cargar carpeta",
+                        "variant": "secondary"
+                    },
+                    {
+                        "id": "loadFiles",
+                        "label": "Cargar archivos",
+                        "variant": "secondary"
+                    },
+                    {
+                        "id": "clear",
+                        "label": "Limpiar todo",
+                        "variant": "secondary"
+                    },
+                    { "id": "start", "label": "Iniciar", "variant": "primary" }
+                ]
+            }
+        },
+        "analisis": {
+            "toolbar": {
+                "actions": [
+                    {
+                        "id": "recalcular",
+                        "label": "Recalcular",
+                        "variant": "secondary"
+                    },
+                    {
+                        "id": "persistExcel",
+                        "label": "Persistir en Excel",
+                        "variant": "primary"
+                    }
+                ]
+            }
+        }
+    }
+}

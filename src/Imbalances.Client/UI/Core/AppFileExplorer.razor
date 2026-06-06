@@ -118,8 +118,8 @@
                 }
             </div>
             <div class="panel-footer">
-                <MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="Cancelar" Class="footer-btn">Limpiar Todo</MudButton>
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ProcesarSeleccion" Disabled="@(!GetSelectedFiles(onlyVisible: false).Any(f => f.BrowserFile != null))" Class="footer-btn confirm-btn px-8">Iniciar</MudButton>
+                <MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="Cancelar" Disabled="@procesando" Class="footer-btn">Limpiar Todo</MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ProcesarSeleccion" Disabled="@(!GetSelectedFiles(onlyVisible: false).Any(f => f.BrowserFile != null) || procesando)" Class="footer-btn confirm-btn px-8">@(procesando ? "Procesando..." : "Iniciar")</MudButton>
             </div>
         </div>
     </div>
@@ -218,7 +218,7 @@
     {
         var progreso = ProgressService.ObtenerEstado();
         if (progreso.TotalSteps <= 0) return string.Empty;
-        return $"{progreso.EtapaActual} ({progreso.CurrentStep} de {progreso.TotalSteps})";
+        return $"{progreso.EtapaActual} ({Math.Max(1, progreso.CurrentStep)} de {progreso.TotalSteps})";
     }
 
     private Color GetLogColor(string estado)
@@ -474,6 +474,7 @@
 
             ExplorerState.Resultados = resultados;
             ExplorerState.IsProcessing = false;
+            Console.WriteLine("[Persistencia] AppFileExplorer: guardando estado - TreeItems: " + ExplorerState.TreeItems.Count + ", Resultados: " + ExplorerState.Resultados.Count + ", Hallazgos: " + ExplorerState.Hallazgos.Count);
             await StatePersistence.GuardarEstadoAsync(new PersistenceState
             {
                 Resultados = ExplorerState.Resultados,
@@ -483,6 +484,8 @@
                 EstadosHallazgos = ExplorerState.EstadosHallazgos,
                 ArchivosProcesados = ExplorerState.ArchivosProcesados,
                 ArchivosSeleccionados = ExplorerState.ArchivosSeleccionados,
+                TreeItems = ExplorerState.TreeItems,
+                Logs = logsProcesamiento,
                 SesionFinalizada = true
             });
         }

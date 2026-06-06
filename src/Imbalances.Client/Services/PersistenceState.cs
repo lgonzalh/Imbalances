@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Imbalances.Client.Models;
 using Imbalances.Core.Models;
 
 namespace Imbalances.Client.Services;
@@ -13,5 +14,8 @@ public class PersistenceState
     public Dictionary<string, string> EstadosHallazgos { get; set; } = new();
     public HashSet<string> ArchivosProcesados { get; set; } = new();
     public List<string> ArchivosSeleccionados { get; set; } = new();
+    public List<FileTreeItem> TreeItems { get; set; } = new();
+    public List<Movimiento> MovimientosMotor1 { get; set; } = new();
+    public List<LogProceso> Logs { get; set; } = new();
     public bool SesionFinalizada { get; set; }
 }

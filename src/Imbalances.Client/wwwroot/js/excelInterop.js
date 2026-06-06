@@ -176,7 +176,7 @@ window.excelInterop = {
             return { ok: false, errors: errors, config: null };
         }
 
-        const reqEmpresas = ['Nombre carpeta', 'Nombre empresa'];
+        const reqEmpresas = ['Nombre carpeta', 'Nombre empresa', 'Alias', 'Company Code', 'Conc_Op'];
         const reqCuentas = ['Nombre cuenta', 'Tipo (CxC|CxP)', 'Columna valor', 'Columna nota'];
 
         function normalizeHeaderCell(v) {
@@ -197,7 +197,8 @@ window.excelInterop = {
             }
 
             const effective = lastNonEmpty >= 0 ? header.slice(0, lastNonEmpty + 1) : [];
-            const extraNonEmpty = effective.length > expected.length;
+            const extraNonEmpty = effective.length > expected.length
+                && !(normSheetName(sheetName) === 'EMPRESAS' && effective.every((v, idx) => idx >= expected.length ? v === '' : true));
             const missingCount = effective.length < expected.length;
 
             const expectedNorm = expected.map(normalizeHeaderCell);
@@ -216,7 +217,11 @@ window.excelInterop = {
                 }
             }
 
-            if (missingCount || extraNonEmpty || badNames) {
+            if (normSheetName(sheetName) === 'EMPRESAS' && effectiveNorm.length >= expectedNorm.length) {
+                badNames = expectedNorm.some((h, idx) => (effectiveNorm[idx] ?? '') !== h);
+            }
+
+            if (missingCount || (extraNonEmpty && normSheetName(sheetName) !== 'EMPRESAS') || badNames) {
                 errors.push(`${sheetName}: Encabezados inválidos. Se esperaba: ${expected.join(' | ')}.`);
                 if (effective.length) {
                     errors.push(`${sheetName}: Encabezados encontrados: ${effective.join(' | ')}.`);
@@ -256,11 +261,15 @@ window.excelInterop = {
 
             const nombreCarpeta = norm(row[0]);
             const nombreEmpresa = norm(row[1]);
+            const alias = norm(row[2]);
+            const companyCode = norm(row[3] || '');
+            const concOp = norm(row[4] || '');
 
             if (!nombreCarpeta) errors.push(`Empresas: Fila ${i + 1}, Columna 'Nombre carpeta': la celda no puede estar vacía.`);
 
             if (nombreCarpeta) {
-                empresas.push({ NombreEmpresa: nombreEmpresa || '', NombreCarpeta: nombreCarpeta });
+                // Claves en minúscula para coincidir con los JsonPropertyName de C#
+                empresas.push({ nombreEmpresa: nombreEmpresa || '', nombreCarpeta: nombreCarpeta, alias: alias || '', companyCode: companyCode, concOp: concOp });
             }
         }
 
@@ -286,7 +295,7 @@ window.excelInterop = {
             if (!columnaNota) errors.push(`Cuentas: Fila ${i + 1}, Columna 'Columna nota': la celda no puede estar vacía.`);
 
             if (nombreCuenta && (tipo === 'CxC' || tipo === 'CxP') && columnaValor && columnaNota) {
-                cuentas.push({ NombreCuenta: nombreCuenta, Tipo: tipo, ColumnaValor: columnaValor, ColumnaNota: columnaNota });
+                cuentas.push({ nombreCuenta: nombreCuenta, tipo: tipo, columnaValor: columnaValor, columnaNota: columnaNota });
             }
         }
 
@@ -297,38 +306,98 @@ window.excelInterop = {
             return { ok: false, errors: errors, config: null };
         }
 
-        return { ok: true, errors: [], config: { Empresas: empresas, Cuentas: cuentas } };
+        return { ok: true, errors: [], config: { empresas: empresas, cuentas: cuentas } };
+    },
+
+    descargarInforme: function (datosCxC, datosCxP, fileName) {
+        const headers = ['CORTE', 'Company', 'Nom_company', 'Trade Partner', 'Nom_Trade_P', 'Conc_op', 'Tipo (C= Cob)', 'USD'];
+
+        const buildRows = (datos, tipoLetra) => {
+            const rows = [headers];
+            for (const item of (datos || [])) {
+                rows.push([
+                    '',
+                    item.companyCode || '',
+                    item.empresa || '',
+                    item.tradePartnerCode || '',
+                    item.empresaContraparte || '',
+                    item.concOp || '',
+                    tipoLetra,
+                    typeof item.valor === 'number' ? item.valor : Number(item.valor || 0)
+                ]);
+            }
+            return rows;
+        };
+
+        const rowsCxC = buildRows(datosCxC, 'P');
+        const rowsCxP = buildRows(datosCxP, 'C');
+
+        const wb = XLSX.utils.book_new();
+        const wsCxC = XLSX.utils.aoa_to_sheet(rowsCxC);
+        const wsCxP = XLSX.utils.aoa_to_sheet(rowsCxP);
+
+        const cols = [
+            { wch: 10 }, { wch: 10 }, { wch: 35 }, { wch: 15 }, { wch: 35 }, { wch: 10 }, { wch: 15 }, { wch: 15 }
+        ];
+        wsCxC['!cols'] = cols;
+        wsCxP['!cols'] = cols;
+
+        XLSX.utils.book_append_sheet(wb, wsCxC, 'CxC');
+        XLSX.utils.book_append_sheet(wb, wsCxP, 'CxP');
+
+        const out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+        const blob = new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+
+        const name = (fileName && String(fileName).trim()) ? String(fileName).trim() : 'Informe_Imbalances.xlsx';
+        const finalName = name.toLowerCase().endsWith('.xlsx') ? name : `${name}.xlsx`;
+
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = finalName;
+        document.body.appendChild(a);
+        a.click();
+        URL.revokeObjectURL(a.href);
+        document.body.removeChild(a);
     },
 
     descargarConfiguracionMotor: function (config, fileName) {
-        const reqEmpresas = ['Nombre carpeta', 'Nombre empresa'];
+        const reqEmpresas = ['Nombre carpeta', 'Nombre empresa', 'Alias', 'Company Code', 'Conc_Op'];
         const reqCuentas = ['Nombre cuenta', 'Tipo (CxC|CxP)', 'Columna valor', 'Columna nota'];
 
-        const empresas = (config && config.Empresas) ? config.Empresas : [];
-        const cuentas = (config && config.Cuentas) ? config.Cuentas : [];
+        // C# serializa con System.Text.Json (camelCase + JsonPropertyName),
+        // por lo que las claves vienen en minúscula.
+        const empresas = (config && config.empresas) ? config.empresas : [];
+        const cuentas = (config && config.cuentas) ? config.cuentas : [];
+
+        if (!empresas.length && !cuentas.length) {
+            console.warn('[Export] No hay datos para exportar (empresas y cuentas vacíos).');
+        }
 
         const rowsEmpresas = [reqEmpresas];
         for (const e of empresas) {
             rowsEmpresas.push([
-                (e && e.NombreCarpeta) ? String(e.NombreCarpeta) : '',
-                (e && e.NombreEmpresa) ? String(e.NombreEmpresa) : ''
+                (e && e.nombreCarpeta) ? String(e.nombreCarpeta) : '',
+                (e && e.nombreEmpresa) ? String(e.nombreEmpresa) : '',
+                (e && e.alias) ? String(e.alias) : '',
+                (e && e.companyCode) ? String(e.companyCode) : '',
+                (e && e.concOp) ? String(e.concOp) : ''
             ]);
         }
 
         const rowsCuentas = [reqCuentas];
         for (const c of cuentas) {
             rowsCuentas.push([
-                (c && c.NombreCuenta) ? String(c.NombreCuenta) : '',
-                (c && c.Tipo) ? String(c.Tipo) : '',
-                (c && c.ColumnaValor) ? String(c.ColumnaValor) : '',
-                (c && c.ColumnaNota) ? String(c.ColumnaNota) : ''
+                (c && c.nombreCuenta) ? String(c.nombreCuenta) : '',
+                (c && c.tipo) ? String(c.tipo) : '',
+                (c && c.columnaValor) ? String(c.columnaValor) : '',
+                (c && c.columnaNota) ? String(c.columnaNota) : ''
             ]);
         }
 
         const wb = XLSX.utils.book_new();
 
         const wsEmpresas = XLSX.utils.aoa_to_sheet(rowsEmpresas);
-        wsEmpresas['!cols'] = [{ wch: 24 }, { wch: 38 }];
+        wsEmpresas['!cols'] = [{ wch: 24 }, { wch: 38 }, { wch: 24 }, { wch: 24 }, { wch: 24 }];
 
         const wsCuentas = XLSX.utils.aoa_to_sheet(rowsCuentas);
         wsCuentas['!cols'] = [{ wch: 44 }, { wch: 14 }, { wch: 16 }, { wch: 16 }];

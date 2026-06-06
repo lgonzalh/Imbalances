@@ -1,4 +1,146 @@
+## 1.4.1
+- Versi�n: 1.4.1.0
+- Fecha: 2026-06-05
+- Fix: Logs de procesamiento ahora persisten al navegar entre p�ginas (se agreg� Logs a PersistenceState)
+- Build: 0 errores, 0 warnings
+
+## 1.4.0
+- Versión: 1.4.0.0
+- Fecha: 2026-06-05
+- CompanyCode / TradePartnerCode / ConcOp ahora se resuelven desde EmpresaConfig en ExtractorEngine (no más valores vacíos en Excel de Informe)
+- Build: 0 errores, 0 warnings
 # Imbalances - Registro de Versiones
+
+# Imbalances - Registro de Versiones
+
+## v1.3.0 (2026-06-05)
+
+### 🚀 CompanyCode, ConcOp y detección de cambios no guardados
+
+**Problema**: El informe descargable (Excel) dejaba vacías las columnas Company, Trade Partner y Conc_op porque la configuración de empresa no incluía estos campos.
+
+**Solución**:
+
+1. **Nuevos campos en EmpresaConfig**: CompanyCode y ConcOp con persistencia completa en Firestore, Excel (import/export) y UI.
+
+2. **Informe poblado**: El Excel descargable ahora lee CompanyCode de la empresa origen, y CompanyCode/ConcOp de la contraparte (con resolución por alias).
+
+3. **Detección de cambios no guardados en Configuración**: 
+   - Flag _hasUnsavedChanges en cada input del grid.
+   - NavigationLock para interceptar navegación interna con popup Guardar/Descartar/Quedarse.
+   - eforeunload para evitar cierre accidental del navegador.
+
+4. **Export/Import Excel actualizado**: La hoja Empresas ahora incluye columnas Company Code y Conc_Op (formato v1.3.0, no compatible hacia atrás).
+
+**Archivos Modificados**:
+- src/Imbalances.Core/Models/EmpresaConfig.cs (CompanyCode, ConcOp)
+- src/Imbalances.Core/Models/RegistroContable.cs (CompanyCode, TradePartnerCode, ConcOp)
+- src/Imbalances.Client/wwwroot/js/excelInterop.js (import/export/report)
+- src/Imbalances.Client/Pages/Config.razor (columnas UI, dirty tracking, NavigationLock)
+- src/Imbalances.Client/Pages/Informe.razor (lookup CompanyCode/ConcOp)
+- src/Imbalances.Client/Layout/MainLayout.razor (badge v1.3.0)
+- src/Imbalances.Client/wwwroot/index.html (cache busting v1.3.0)
+- *.csproj (versión 1.3.0)
+- VERSION.md (esta entrada)
+
+**Verificación**: 
+- Abrir Config → editar un campo → navegar a otra página → debe mostrar popup de confirmación.
+- Descargar informe → Company, Trade Partner, Conc_op deben tener valores.
+- Exportar/Importar Excel → las columnas Company Code y Conc_Op deben persistir correctamente.
+
+### 🚀 Caso Especial #1: Homologación FSR (Motor 1)
+
+**Problema**: Notas con referencia abreviada `(FSR)` / `FSR` (ej. "REEMBOLSO LEASING DE AUTO (FSR)") se interpretaban como texto libre y no generaban reciprocidad válida.
+
+**Solución**:
+
+1. **Tabla de alias especiales** (`ConfiguracionCore.AliasEmpresa`): Nuevo modelo `EquivalenciaTercero` con alias → equivalentes (ej. `"FSR" → ["FUNDACION SOLID RIVER"]`). Configurable vía JSON y con valor por defecto en `ConfigService`.
+
+2. **Nuevo Nivel 0 en pipeline de homologación** (`ResolverEmpresaConfigurada`): La detección de alias especiales se ejecuta **antes** del match exacto (Nivel 1), match normalizado (Nivel 2) y fuzzy matching (Niveles 3-4). Soporta:
+   - `(FSR)` → detectado como alias directo `FSR`
+   - `FSR` → detectado como alias directo
+   - `REEMBOLSO LEASING DE AUTO (FSR)` → detectado por sufijo ` FSR`
+   - `MOVIMIENTO (FSR)` → alias detectado (aunque filtrado por `EsFilaEstructural`)
+
+3. **Logging específico**:
+   - `[Info] Alias especial detectado: "FSR" → "FUNDACION SOLID RIVER" | texto: "REEMBOLSO LEASING DE AUTO FSR"`
+   - `[Info] Contraparte especial FSR homologada correctamente: GAMALAB → FUNDACION SOLID RIVER | CxP | 135,409.00`
+   - `[Warning] Alias "FSR" detectado pero no se encontró empresa configurada para: FUNDACION SOLID RIVER`
+
+**Orden del pipeline actualizado**:
+1. Alias especiales (Nivel 0)
+2. Match exacto (Nivel 1)
+3. Match por contención (Nivel 2)
+4. Fuzzy match ≥ 85% (Nivel 3)
+5. Posible match 70-84% (Nivel 4, descartado)
+6. < 70% (Nivel 5, descartado)
+
+### 🚀 Caso Especial #2: Contrapartida obligatoria FSR (Motor 1 - Diagnóstico)
+
+**Problema**: Para FUNDACION SOLID RIVER se requiere reciprocidad obligatoria (CxC ↔ CxP) para que Motor 3 pueda conciliar.
+
+**Solución**: Diagnóstico integrado en `ExtraerDesdeNota` que registra por nota y archivo:
+
+- Cantidad de filas detectadas con `(FSR)` en texto crudo
+- Cantidad de movimientos generados para FUNDACION SOLID RIVER
+- Tipo generado (CxC o CxP) para cada movimiento FSR
+- Validación de nota específica (ej. Nota 17)
+- Valor individual y total FSR generado
+
+**Métricas finales por archivo** (en `ExtraerAsync`):
+- Movimientos FSR generados
+- Valor total FSR generado
+- Detalle por movimiento (origen → contraparte | tipo | valor)
+
+**Archivos Modificados**:
+- `src/Imbalances.Core/Models/ConfiguracionCore.cs` (nueva propiedad `AliasEmpresa`)
+- `src/Imbalances.Core/Models/EquivalenciaTercero.cs` (JsonPropertyName attributes)
+- `src/Imbalances.Core/Services/Motor1/Motor1Extractor.cs` (Level 0 alias + diagnóstico FSR)
+- `src/Imbalances.Infrastructure/Services/ConfigService.cs` (alias FSR por defecto)
+- `VERSION.md` (esta entrada)
+
+**Archivos NO modificados** (por requerimiento):
+- `cruceIntercompany.ts`
+- `Home.razor`
+- `Informe.razor`
+- `FirebaseMotorsService.cs`
+
+**Verificación**: Ejecutar Motor 1 sobre archivo GAMALAB (Nota 17). El log debe mostrar:
+```
+[Info] Alias especial detectado: "FSR" → "FUNDACION SOLID RIVER"
+[Info] Contraparte especial FSR homologada correctamente
+...
+[Info] --- Métricas finales FSR ---
+[Info]   Movimientos FSR generados: 1
+[Info]     • VACUNATORIO INTERNACIONAL → FUNDACION SOLID RIVER | CxP | 135,409.00
+[Info]   Valor total FSR generado: 135,409.00
+```
+
+## v1.1.25 (2026-06-04)
+
+### 🚀 Fix Motor 1 — Descuadres falsos por contrapartes no configuradas (IPIC)
+
+**Problema**: Motor 3 reportaba 32 descuadres en IPIC (periodo 2026-06) porque `Motor1Extractor` interpretaba filas estructurales de las Notas (ej. "RESUMEN DE ANTIGUEDAD POR PAGAR", "MOVIMIENTO DURANTE EL MES", "DESARROLLO DE ACTIVIDADES POR COBRAR") como nombres de empresa contraparte. Todas tenían `cuenta = "AGRUPADO"` en Firestore.
+
+**Solución — 4 cambios clave**:
+
+1. **Rubro tracking en Notas** (`Motor1Extractor.cs`): Filas sin valor numérico en columna I actualizan `rubroActual`; filas con valor se interpretan como potenciales empresas contraparte. El rubro se conserva en `Cuenta` del `RegistroContable`.
+
+2. **Validación contra configuración** (`ResolverEmpresaConfigurada`): 4 niveles de matched — exacto, prefijo, contención, token overlap ≥60%. Contrapartes no encontradas en la colección `empresas` se descartan (con Warning en log, archivo/hoja/rubro).
+
+3. **Filtro de filas estructurales** (`EsFilaEstructural`, `EsGranTotal`): TOTAL, SUBTOTAL y descriptores contables se ignoran; solo "GRAN TOTAL" rompe el bucle. `BuscarInicioTabla()` simplificado: solo busca "MOVIMIENTO".
+
+4. **Agrupación mejorada** (`MovimientosIntercompanyService.cs`): `NormalizarYAgrupar()` preserva la `Cuenta` (rubro) y agrupa por `{EmpresaOrigen, EmpresaContraparte, Tipo, Cuenta, Periodo}`.
+
+**Hash de dedup** (`guardarMovimientos.ts`): Incluye `cuenta` → `empresa|contraparte|tipo|cuenta|periodo`.
+
+**Archivos Modificados**:
+- `src/Imbalances.Core/Services/Motor1/Motor1Extractor.cs`
+- `src/Imbalances.Client/Services/MovimientosIntercompanyService.cs`
+- `functions/src/motor2/guardarMovimientos.ts`
+- `src/Imbalances.Tests/ExtractorEngineMotor1Tests.cs`
+
+**Verificación**: Extraer IPIC 2026-06 debe producir 0 descuadres (vs 32 anteriores). Los movimientos con contrapartes contables serán descartados silenciosamente con Warning en log.
 
 ## v1.1.24 (2026-06-03)
 

@@ -20,6 +20,17 @@ public class ExtractorEngine : IExtractorEngine
     {
         var nombreArchivo = Path.GetFileName(filePath);
         var movimientos = await ProcesarArchivoMotor1Async(filePath, fileStream, config, periodo: string.Empty, onProgressLog);
+
+        var empresaLookup = new Dictionary<string, EmpresaConfig>(StringComparer.OrdinalIgnoreCase);
+        foreach (var e in config.Empresas)
+        {
+            if (!string.IsNullOrWhiteSpace(e.NombreEmpresa) && !empresaLookup.ContainsKey(e.NombreEmpresa))
+                empresaLookup[e.NombreEmpresa] = e;
+            if (!string.IsNullOrWhiteSpace(e.NombreCarpeta) && !empresaLookup.ContainsKey(e.NombreCarpeta))
+                empresaLookup[e.NombreCarpeta] = e;
+            if (!string.IsNullOrWhiteSpace(e.Alias) && !empresaLookup.ContainsKey(e.Alias))
+                empresaLookup[e.Alias] = e;
+        }
         var resultados = movimientos.Select(m => new RegistroContable
         {
             Empresa = m.EmpresaOrigen,
@@ -31,7 +42,10 @@ public class ExtractorEngine : IExtractorEngine
             Valor = m.Valor,
             ArchivoOrigen = nombreArchivo,
             HojaOrigen = string.IsNullOrWhiteSpace(m.Nota) ? string.Empty : $"Nota {m.Nota}",
-            TextoOrigen = m.EmpresaContraparte
+            TextoOrigen = m.EmpresaContraparte,
+            CompanyCode = empresaLookup.TryGetValue(m.EmpresaOrigen, out var src) ? src.CompanyCode : string.Empty,
+            TradePartnerCode = empresaLookup.TryGetValue(m.EmpresaContraparte, out var dst) ? dst.CompanyCode : string.Empty,
+            ConcOp = empresaLookup.TryGetValue(m.EmpresaContraparte, out var cp) ? cp.ConcOp : string.Empty
         }).ToList();
 
         return resultados;

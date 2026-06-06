@@ -16,4 +16,7 @@ public class ConfiguracionCore
 
     [JsonPropertyName("equivalencias")]
     public List<CuentaEquivalencia> Equivalencias { get; set; } = new();
+
+    [JsonPropertyName("aliasEmpresa")]
+    public List<EquivalenciaTercero> AliasEmpresa { get; set; } = new();
 }

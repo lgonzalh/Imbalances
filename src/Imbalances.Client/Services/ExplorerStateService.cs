@@ -19,8 +19,21 @@ public class ExplorerStateService
     public HashSet<string> ArchivosProcesados { get; set; } = new();
     public List<string> ArchivosSeleccionados { get; set; } = new();
     public bool HaySesionPendiente { get; set; } = false;
-    public bool IsProcessing { get; set; } = false;
+    public bool PasswordUnlocked { get; set; } = false;
+    private bool _isProcessing;
 
+    public bool IsProcessing
+    {
+        get => _isProcessing;
+        set
+        {
+            if (_isProcessing == value) return;
+            _isProcessing = value;
+            OnIsProcessingChanged?.Invoke();
+        }
+    }
+
+    public event Action? OnIsProcessingChanged;
     public event Action<InputFileChangeEventArgs>? OnInputFileChange;
     public void NotifyInputFileChanged(InputFileChangeEventArgs e) => OnInputFileChange?.Invoke(e);
     

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Components.Forms;
 using MudBlazor;
 
@@ -11,6 +12,8 @@ public sealed class FileTreeItem : ITreeItemData<FileTreeItem>
     public string Path { get; set; } = string.Empty;
     public bool IsFolder { get; set; }
     public int Level { get; set; }
+
+    [JsonIgnore]
     public IBrowserFile? BrowserFile { get; set; }
 
     private bool? _isSelected;
@@ -52,6 +55,7 @@ public sealed class FileTreeItem : ITreeItemData<FileTreeItem>
     public string? SelectedIcon { get; set; }
     public bool Expanded { get => IsExpanded; set => IsExpanded = value; }
 
+    [JsonIgnore]
     public FileTreeItem Value => this;
 
     public bool Expandable

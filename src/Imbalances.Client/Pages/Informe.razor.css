@@ -1,3 +1,45 @@
+.informe-filter-bar {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 16px;
+    padding: 12px 20px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    margin-bottom: 16px;
+}
+
+.informe-filter-title {
+    color: #002c54;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+}
+
+.informe-filter-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.informe-filter-input {
+    width: 180px;
+}
+
+.informe-filter-count {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--color-primary);
+    white-space: nowrap;
+}
+
+.informe-filter-check {
+    white-space: nowrap;
+    font-size: 0.8rem;
+}
+
 .report-header-metrics {
     display: flex;
     gap: 12px;

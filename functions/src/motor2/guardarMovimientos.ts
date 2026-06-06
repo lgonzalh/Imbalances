@@ -121,7 +121,7 @@ export const guardarMovimientos = onRequest(
                 continue;
             }
 
-            const hash = `${empresa}|${contraparte}|${tipo}|${periodo}`;
+            const hash = `${empresa}|${contraparte}|${tipo}|${cuenta}|${periodo}`;
             if (hashesExistentes.has(hash)) {
                 duplicados++;
                 continue;

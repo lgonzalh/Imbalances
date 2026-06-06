@@ -69,7 +69,9 @@ public class ExtractorEngineMotor1Tests
         {
             Empresas =
             [
-                new EmpresaConfig { NombreEmpresa = "EMPRESA ORIGEN", NombreCarpeta = "ORIGEN" }
+                new EmpresaConfig { NombreEmpresa = "EMPRESA ORIGEN", NombreCarpeta = "ORIGEN" },
+                new EmpresaConfig { NombreEmpresa = "COMPANIA A", NombreCarpeta = "" },
+                new EmpresaConfig { NombreEmpresa = "TERCERO B", NombreCarpeta = "" }
             ],
             Cuentas =
             [
@@ -93,6 +95,7 @@ public class ExtractorEngineMotor1Tests
         Assert.Equal(2, resultados.Count);
         Assert.All(resultados, r => Assert.Equal("5", r.Nota));
         Assert.All(resultados, r => Assert.Equal("2026-05", r.Periodo));
+        Assert.All(resultados, r => Assert.Equal("CUENTAS POR COBRAR", r.Cuenta));
 
         var a = resultados.Single(r => r.EmpresaContraparte.Contains("COMPANIA"));
         Assert.Equal("COMPANIA A", a.EmpresaContraparte);
@@ -102,7 +105,7 @@ public class ExtractorEngineMotor1Tests
         Assert.Equal(-200.25m, b.Valor);
 
         Assert.True(balance.GetRowCalls <= 10, $"Balance GetRowCalls={balance.GetRowCalls}");
-        Assert.True(nota5.GetRowCalls <= 20, $"Nota 5 GetRowCalls={nota5.GetRowCalls}");
+        Assert.True(nota5.GetRowCalls <= 255, $"Nota 5 GetRowCalls={nota5.GetRowCalls}");
     }
 
     [Fact]

@@ -25,4 +25,13 @@ public class EmpresaConfig
 
     [JsonPropertyName("hojaBalance")]
     public string HojaBalance { get; set; } = string.Empty;
+
+    [JsonPropertyName("alias")]
+    public string Alias { get; set; } = string.Empty;
+
+    [JsonPropertyName("companyCode")]
+    public string CompanyCode { get; set; } = string.Empty;
+
+    [JsonPropertyName("concOp")]
+    public string ConcOp { get; set; } = string.Empty;
 }

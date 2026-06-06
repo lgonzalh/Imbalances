@@ -1,5 +1,6 @@
 @inherits LayoutComponentBase
 @inject Imbalances.Client.Services.ExplorerStateService ExplorerState
+@implements IDisposable
 
 <MudThemeProvider Theme="_currentTheme" />
 <MudPopoverProvider />
@@ -10,7 +11,7 @@
 <MudLayout>
     <MudAppBar Elevation="0" Class="mud-elevation-0" Style="background-color: #002C54; color: #FFFFFF; border-bottom: 2px solid #555960;">
         <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@((e) => DrawerToggle())" />
-        <MudText Typo="Typo.h5" Class="ml-3" Style="font-weight: 700; letter-spacing: 1.5px;">IMBALANCES <MudChip T="string" Size="Size.Small" Color="Color.Secondary" Variant="Variant.Filled" Class="ml-2 mt-n1" Style="font-size: 0.65rem;">v1.1.16</MudChip></MudText>
+        <MudText Typo="Typo.h5" Class="ml-3" Style="font-weight: 700; letter-spacing: 1.5px;">IMBALANCES <MudChip T="string" Size="Size.Small" Color="Color.Secondary" Variant="Variant.Filled" Class="ml-2 mt-n1" Style="font-size: 0.65rem;">v1.4.0</MudChip></MudText>
         <MudSpacer />
         <MudText Typo="Typo.caption" Class="mr-4">© 2021-2026 <strong>Lantonium</strong>. Todos los derechos reservados.</MudText>
     </MudAppBar>
@@ -19,10 +20,10 @@
             <MudText Typo="Typo.h6" Style="color: #002C54; font-weight: 700;">Menú Principal</MudText>
         </MudDrawerHeader>
         <MudNavMenu>
-            <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Outlined.Folder" Style="color: #002C54;">Explorador</MudNavLink>
-            <MudNavLink Href="/analisis" Icon="@Icons.Material.Outlined.Analytics" Style="color: #002C54;">Análisis</MudNavLink>
-            <MudNavLink Href="/informe" Icon="@Icons.Material.Outlined.Description" Style="color: #002C54;">Informe</MudNavLink>
-            <MudNavLink Href="/config" Icon="@Icons.Material.Outlined.Settings" Style="color: #002C54;">Configuración</MudNavLink>
+            <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Outlined.Folder" Disabled="@ExplorerState.IsProcessing" Style="color: #002C54;">Explorador</MudNavLink>
+            <MudNavLink Href="/analisis" Icon="@Icons.Material.Outlined.Analytics" Disabled="@ExplorerState.IsProcessing" Style="color: #002C54;">Análisis</MudNavLink>
+            <MudNavLink Href="/informe" Icon="@Icons.Material.Outlined.Description" Disabled="@ExplorerState.IsProcessing" Style="color: #002C54;">Informe</MudNavLink>
+            <MudNavLink Href="/config" Icon="@Icons.Material.Outlined.Settings" Disabled="@ExplorerState.IsProcessing" Style="color: #002C54;">Configuración</MudNavLink>
         </MudNavMenu>
     </MudDrawer>
     <MudMainContent Style="background-color: var(--app-bg);">
@@ -32,8 +33,32 @@
     </MudMainContent>
 </MudLayout>
 
+<style>
+    .mud-nav-link.mud-disabled {
+        opacity: 0.4 !important;
+        cursor: default !important;
+        pointer-events: none !important;
+    }
+    .mud-nav-link.mud-disabled .mud-nav-link-icon {
+        opacity: 0.4 !important;
+    }
+    .mud-nav-link.mud-disabled .mud-nav-link-text {
+        opacity: 0.4 !important;
+    }
+</style>
+
 @code {
     bool _drawerOpen = true;
+
+    protected override void OnInitialized()
+    {
+        ExplorerState.OnIsProcessingChanged += StateHasChanged;
+    }
+
+    public void Dispose()
+    {
+        ExplorerState.OnIsProcessingChanged -= StateHasChanged;
+    }
 
     private MudTheme _currentTheme = new MudTheme()
     {

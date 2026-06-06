@@ -17,7 +17,7 @@ public static class MovimientosIntercompanyService
                 EmpresaOrigen = NormalizeId(m.EmpresaOrigen),
                 EmpresaContraparte = NormalizeId(m.EmpresaContraparte),
                 Tipo = NormalizeTipo(m.Tipo),
-                Cuenta = "AGRUPADO",
+                Cuenta = NormalizeId(m.Cuenta),
                 Nota = string.Empty,
                 Valor = m.Valor,
                 Periodo = periodo,
@@ -28,13 +28,13 @@ public static class MovimientosIntercompanyService
             .ToList();
 
         return normalizados
-            .GroupBy(m => new { m.EmpresaOrigen, m.EmpresaContraparte, m.Tipo, m.Periodo })
+            .GroupBy(m => new { m.EmpresaOrigen, m.EmpresaContraparte, m.Tipo, m.Cuenta, m.Periodo })
             .Select(g => new Movimiento
             {
                 EmpresaOrigen = g.Key.EmpresaOrigen,
                 EmpresaContraparte = g.Key.EmpresaContraparte,
                 Tipo = g.Key.Tipo,
-                Cuenta = "AGRUPADO",
+                Cuenta = g.Key.Cuenta,
                 Nota = string.Empty,
                 Valor = g.Sum(x => x.Valor),
                 Periodo = g.Key.Periodo,
@@ -42,6 +42,7 @@ public static class MovimientosIntercompanyService
             .Where(m => m.Valor != 0)
             .OrderBy(m => m.EmpresaOrigen)
             .ThenBy(m => m.EmpresaContraparte)
+            .ThenBy(m => m.Cuenta)
             .ThenBy(m => m.Tipo)
             .ToList();
     }

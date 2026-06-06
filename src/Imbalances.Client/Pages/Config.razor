@@ -5,6 +5,7 @@
 @inject Imbalances.Client.Services.FirebaseMotorsService FirebaseMotors
 @inject Microsoft.Extensions.Configuration.IConfiguration Configuration
 @inject Imbalances.Core.Services.IProgressService ProgressService
+@inject NavigationManager Navigation
 @using Imbalances.Core.Models
 @using Imbalances.Core.Services
 @using Microsoft.JSInterop
@@ -17,22 +18,39 @@
         <AppToolbar PageKey="config" OnAction="HandleAction" OnFileAction="HandleFileAction" />
     </Toolbar>
     <ChildContent>
-        <AppCard Title="GRID 1: EMPRESAS">
-            <AppGrid TItem="EmpresaConfig" Items="@_config.Empresas" Selectable="true" SelectedIndexes="@_empresasSel" SelectedIndexesChanged="@OnEmpresasSelChanged">
-                <Columns>
-                    <AppGridColumn TItem="EmpresaConfig" Title="Nombre carpeta">
-                        <CellTemplate Context="item">
-                            <input class="app-input" value="@item.NombreCarpeta" @oninput="(e) => item.NombreCarpeta = e.Value?.ToString() ?? string.Empty" />
-                        </CellTemplate>
-                    </AppGridColumn>
-                    <AppGridColumn TItem="EmpresaConfig" Title="Nombre empresa">
-                        <CellTemplate Context="item">
-                            <input class="app-input" value="@item.NombreEmpresa" @oninput="(e) => item.NombreEmpresa = e.Value?.ToString() ?? string.Empty" />
-                        </CellTemplate>
-                    </AppGridColumn>
-                </Columns>
-            </AppGrid>
-        </AppCard>
+        <PasswordProtection Title="GRID 1: EMPRESAS" CorrectPassword="Juanes" OnUnlocked="@OnEmpresasUnlocked">
+            <AppCard Title="GRID 1: EMPRESAS">
+                <AppGrid TItem="EmpresaConfig" Items="@_config.Empresas" Selectable="true" SelectedIndexes="@_empresasSel" SelectedIndexesChanged="@OnEmpresasSelChanged">
+                    <Columns>
+                        <AppGridColumn TItem="EmpresaConfig" Title="Nombre carpeta">
+                            <CellTemplate Context="item">
+                                <input class="app-input" value="@item.NombreCarpeta" @oninput="(e) => item.NombreCarpeta = e.Value?.ToString() ?? string.Empty" />
+                            </CellTemplate>
+                        </AppGridColumn>
+                        <AppGridColumn TItem="EmpresaConfig" Title="Nombre empresa">
+                            <CellTemplate Context="item">
+                                <input class="app-input" value="@item.NombreEmpresa" @oninput="(e) => item.NombreEmpresa = e.Value?.ToString() ?? string.Empty" />
+                            </CellTemplate>
+                        </AppGridColumn>
+                                                <AppGridColumn TItem="EmpresaConfig" Title="ALIAS (OPCIONAL)">
+                            <CellTemplate Context="item">
+                                <input class="app-input" value="@item.Alias" @oninput="(e) => { item.Alias = e.Value?.ToString() ?? string.Empty; MarcarCambios(); }" />
+                            </CellTemplate>
+                        </AppGridColumn>
+                        <AppGridColumn TItem="EmpresaConfig" Title="Company Code">
+                            <CellTemplate Context="item">
+                                <input class="app-input" value="@item.CompanyCode" @oninput="(e) => { item.CompanyCode = e.Value?.ToString() ?? string.Empty; MarcarCambios(); }" />
+                            </CellTemplate>
+                        </AppGridColumn>
+                        <AppGridColumn TItem="EmpresaConfig" Title="Conc Op">
+                            <CellTemplate Context="item">
+                                <input class="app-input" value="@item.ConcOp" @oninput="(e) => { item.ConcOp = e.Value?.ToString() ?? string.Empty; MarcarCambios(); }" />
+                            </CellTemplate>
+                        </AppGridColumn>
+                    </Columns>
+                </AppGrid>
+            </AppCard>
+        </PasswordProtection>
 
         <AppCard Title="GRID 2: CUENTAS">
             <AppGrid TItem="CuentaConfig" Items="@_config.Cuentas" Selectable="true" SelectedIndexes="@_cuentasSel" SelectedIndexesChanged="@OnCuentasSelChanged">
@@ -71,9 +89,21 @@
     private HashSet<int> _empresasSel = new();
     private HashSet<int> _cuentasSel = new();
     private readonly IReadOnlyList<string> _snapshotComponents = new[] { "AppPageContainer", "AppCard", "AppGrid", "AppToolbar" };
+    #pragma warning disable CS0414 // kept for future internal nav validation
+    private bool _hasUnsavedChanges;
+    #pragma warning restore CS0414
+
+    private Task OnEmpresasUnlocked() => Task.CompletedTask;
+
+    private void MarcarCambios()
+    {
+        _hasUnsavedChanges = true;
+        _ = JS.InvokeVoidAsync("eval", "window._imbalancesUnsavedChanges = true");
+    }
 
     protected override async Task OnInitializedAsync()
     {
+        await SetupBeforeUnload();
         try
         {
             var functionsBaseUrl = Configuration["Firebase:FunctionsBaseUrl"] ?? string.Empty;
@@ -85,6 +115,8 @@
                 {
                     _config = remoteConfig;
                     await ConfigService.GuardarConfiguracionAsync(_config); // Sync local cache
+                    _hasUnsavedChanges = false;
+                    await JS.InvokeVoidAsync("eval", "window._imbalancesUnsavedChanges = false");
                     return;
                 }
             }
@@ -95,6 +127,12 @@
         }
 
         _config = await ConfigService.CargarConfiguracionAsync();
+    }
+
+    private async Task SetupBeforeUnload()
+    {
+        await JS.InvokeVoidAsync("eval", "window._imbalancesUnsavedChanges = false");
+        await JS.InvokeVoidAsync("eval", "(function() { if (!window._imbalancesBeforeUnloadSet) { window._imbalancesBeforeUnloadSet = true; window.addEventListener(\"beforeunload\", function(e) { if (window._imbalancesUnsavedChanges) { e.preventDefault(); e.returnValue = \"\"; } }); } })();");
     }
 
     private Task OnEmpresasSelChanged(HashSet<int> indexes)
@@ -174,11 +212,13 @@
         }
 
         await ConfigService.GuardarConfiguracionAsync(_config);
+        _hasUnsavedChanges = false;
+        await JS.InvokeVoidAsync("eval", "window._imbalancesUnsavedChanges = false");
         Ui.ShowSuccess("Configuración guardada localmente.");
     }
 
-    private void AddEmpresa() => _config.Empresas.Add(new EmpresaConfig());
-    private void AddCuenta() => _config.Cuentas.Add(new CuentaConfig());
+    private void AddEmpresa() { _config.Empresas.Add(new EmpresaConfig()); MarcarCambios(); }
+    private void AddCuenta() { _config.Cuentas.Add(new CuentaConfig()); MarcarCambios(); }
     private void AddNota() => _config.Notas.Add(new NotaConfig());
     private void AddEquivalencia() => _config.Equivalencias.Add(new CuentaEquivalencia());
 
@@ -222,8 +262,17 @@
 
     private async Task ExportarConfig()
     {
+        Console.WriteLine($"[Info] Exportando configuración");
+        Console.WriteLine($"[Info] Empresas: {_config.Empresas.Count}");
+        Console.WriteLine($"[Info] Cuentas: {_config.Cuentas.Count}");
+
         await JS.InvokeVoidAsync("excelInterop.descargarConfiguracionMotor", _config, "config_imbalances.xlsx");
-        Ui.ShowSuccess("Descarga iniciada.");
+
+        Console.WriteLine($"[Info] Hoja Empresas: {_config.Empresas.Count} filas");
+        Console.WriteLine($"[Info] Hoja Cuentas: {_config.Cuentas.Count} filas");
+        Console.WriteLine($"[Info] Workbook generado correctamente");
+
+        Ui.ShowSuccess($"Descarga iniciada.");
     }
 
     private async Task DescargarLog()
@@ -312,6 +361,8 @@
             _cuentasSel.Clear();
 
             await ConfigService.GuardarConfiguracionAsync(_config);
+            _hasUnsavedChanges = false;
+            await JS.InvokeVoidAsync("eval", "window._imbalancesUnsavedChanges = false");
             Ui.ShowSuccess("Configuración importada y guardada.");
             StateHasChanged();
         }
@@ -347,4 +398,5 @@
 
         return errores;
     }
+
 }

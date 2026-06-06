@@ -1,4 +1,5 @@
 @using Imbalances.Core.Models
+@inject IJSRuntime JS
 
 <AppCard Title="PROCESANDO ARCHIVOS" Collapsible="false">
     <div class="app-progress">
@@ -10,7 +11,7 @@
         @if (Logs.Any())
         {
             <div class="app-progress__log">
-                <div class="app-progress__log-list">
+                <div class="app-progress__log-list" id="app-progress-log-list">
                     @foreach (var log in Logs.TakeLast(120))
                     {
                         <div class="app-progress__log-row">
@@ -31,6 +32,27 @@
 
     [Parameter] public Func<string, string>? LogIconResolver { get; set; }
     [Parameter] public Func<string, Color>? LogColorResolver { get; set; }
+
+    private int _lastLogCount;
+    private bool _scrollToBottom;
+
+    protected override void OnParametersSet()
+    {
+        if (Logs.Count != _lastLogCount)
+        {
+            _lastLogCount = Logs.Count;
+            _scrollToBottom = true;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_scrollToBottom)
+        {
+            _scrollToBottom = false;
+            await JS.InvokeVoidAsync("fileExplorer.scrollToBottom", "app-progress-log-list");
+        }
+    }
 
     private string GetLogIcon(string estado)
     {

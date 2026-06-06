@@ -4,17 +4,45 @@
 @inject ExplorerStateService ExplorerState
 @inject IStatePersistenceService StatePersistence
 @inject IConfigService ConfigService
+@inject IJSRuntime JSRuntime
 
 <PageTitle>Informe - Imbalances</PageTitle>
 
 <AppPageContainer PageKey="informe" Title="" Components="_snapshotComponents">
     <ChildContent>
-        @if (!ExplorerState.Resultados.Any())
+        <PasswordProtection Title="ACCESO RESTRINGIDO - INFORME" CorrectPassword="Juanes" OnUnlocked="@OnInformeUnlocked">
+            @if (!ExplorerState.Resultados.Any())
         {
             <MudAlert Severity="Severity.Info">No hay datos procesados. Se muestran las empresas configuradas con totales en 0.</MudAlert>
         }
 
-        @foreach (var item in Consolidado)
+        <div class="informe-filter-bar">
+            <span class="informe-filter-title">INFORME DE IMBALANCES</span>
+            <div class="informe-filter-controls">
+                <MudCheckBox @bind-Value="_soloConSaldo"
+                             Dense="true"
+                             Color="Color.Primary"
+                             Class="informe-filter-check">Solo con saldo</MudCheckBox>
+                <span class="informe-filter-count">@ConsolidadoFiltrado.Count() empresa(s)</span>
+                <MudTextField @bind-Value="_filtroEmpresa"
+                              Placeholder="Filtro"
+                              Adornment="Adornment.End"
+                              AdornmentIcon="@Icons.Material.Filled.FilterList"
+                              IconSize="Size.Small"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              Clearable="true"
+                              Immediate="true"
+                              Class="informe-filter-input" />
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           OnClick="DescargarExcel"
+                           Size="Size.Small"
+                           StartIcon="@Icons.Material.Filled.Download">Descargar</MudButton>
+            </div>
+        </div>
+
+        @foreach (var item in ConsolidadoFiltrado)
         {
             <AppCard Title="@item.Empresa">
                 <HeaderActions>
@@ -55,6 +83,7 @@
                 </ChildContent>
             </AppCard>
         }
+        </PasswordProtection>
     </ChildContent>
 </AppPageContainer>
 
@@ -73,7 +102,17 @@
 
     private List<ConsolidadoItem> Consolidado = new();
     private int _lastResultadosCount = -1;
+    private List<LogProceso> _savedLogs = new();
     private ConfiguracionCore _config = new();
+    private string _filtroEmpresa = string.Empty;
+    private bool _soloConSaldo = false;
+
+    private IEnumerable<ConsolidadoItem> ConsolidadoFiltrado => Consolidado
+        .Where(x => string.IsNullOrWhiteSpace(_filtroEmpresa)
+                    || x.Empresa.Contains(_filtroEmpresa, StringComparison.OrdinalIgnoreCase))
+        .Where(x => !_soloConSaldo || x.TotalCxC != 0 || x.TotalCxP != 0);
+
+    private Task OnInformeUnlocked() => Task.CompletedTask;
 
     protected override async Task OnInitializedAsync()
     {
@@ -84,23 +123,12 @@
             var savedState = await StatePersistence.CargarEstadoAsync();
             if (savedState != null && savedState.Resultados.Any())
             {
-                ExplorerState.Resultados = savedState.Resultados;
-                ExplorerState.ArchivosProcesados = savedState.ArchivosProcesados;
+                Console.WriteLine("[Informe] Restaurando estado completo desde persistencia - Resultados: " + savedState.Resultados.Count + ", Hallazgos: " + savedState.Hallazgos.Count + ", Reciprocidades: " + savedState.Reciprocidades.Count);
+                AplicarEstadoPersistido(savedState);
             }
         }
 
         GenerarConsolidado();
-
-        if (!ExplorerState.Resultados.Any())
-        {
-            var savedState = await StatePersistence.CargarEstadoAsync();
-            if (savedState != null && savedState.Resultados.Any())
-            {
-                ExplorerState.Resultados = savedState.Resultados;
-                ExplorerState.ArchivosProcesados = savedState.ArchivosProcesados;
-                GenerarConsolidado();
-            }
-        }
     }
 
     protected override void OnAfterRender(bool firstRender)
@@ -117,6 +145,17 @@
     {
         var resultados = ExplorerState.Resultados;
 
+        Console.WriteLine($"[Informe] GenerarConsolidado iniciado");
+        Console.WriteLine($"[Informe] Registros recibidos: {resultados?.Count ?? 0}");
+
+        if (resultados != null && resultados.Any())
+        {
+            var categorias = resultados.GroupBy(r => r.Categoria).Select(g => $"{g.Key}={g.Count()}").ToList();
+            Console.WriteLine($"[Informe] Categorías encontradas: {string.Join(", ", categorias)}");
+            var tipos = resultados.GroupBy(r => r.Tipo).Select(g => $"{g.Key}={g.Count()}").ToList();
+            Console.WriteLine($"[Informe] Tipos encontrados: {string.Join(", ", tipos)}");
+        }
+
         var empresasConfiguradas = _config.Empresas
             .Where(e => !string.IsNullOrWhiteSpace(e.NombreCarpeta))
             .Select(e => string.IsNullOrWhiteSpace(e.NombreEmpresa) ? e.NombreCarpeta.Trim() : e.NombreEmpresa.Trim())
@@ -127,6 +166,7 @@
 
         if (resultados == null || !resultados.Any())
         {
+            Console.WriteLine($"[Informe] Sin resultados → mostrando {empresasConfiguradas.Count} empresas con 0 totales");
             Consolidado = empresasConfiguradas.Count > 0
                 ? empresasConfiguradas
                     .Select(nombre => new ConsolidadoItem { Empresa = nombre, TotalCxC = 0, TotalCxP = 0, Diferencia = 0 })
@@ -137,20 +177,29 @@
 
         var agrupado = resultados
             .GroupBy(r => string.IsNullOrWhiteSpace(r.Empresa) ? "Sin empresa" : r.Empresa)
-            .ToDictionary(g => g.Key, g => new ConsolidadoItem
+            .ToDictionary(g => g.Key, g =>
             {
-                Empresa = g.Key,
-                TotalCxC = g.Where(x => x.Categoria == "CxC").Sum(x => x.Valor),
-                TotalCxP = g.Where(x => x.Categoria == "CxP").Sum(x => x.Valor),
-                Diferencia = g.Where(x => x.Categoria == "CxC").Sum(x => x.Valor) - g.Where(x => x.Categoria == "CxP").Sum(x => x.Valor),
-                DetallesCxC = g.Where(x => x.Categoria == "CxC").OrderBy(x => x.Cuenta).ToList(),
-                DetallesCxP = g.Where(x => x.Categoria == "CxP").OrderBy(x => x.Cuenta).ToList()
+                var cxc = g.Where(x => x.Tipo == "CxC").ToList();
+                var cxp = g.Where(x => x.Tipo == "CxP").ToList();
+
+                Console.WriteLine($"[Informe] Empresa '{g.Key}': {g.Count()} registros | Tipo CxC={cxc.Count} | Tipo CxP={cxp.Count}");
+
+                return new ConsolidadoItem
+                {
+                    Empresa = g.Key,
+                    TotalCxC = cxc.Sum(x => x.Valor),
+                    TotalCxP = cxp.Sum(x => x.Valor),
+                    Diferencia = cxc.Sum(x => x.Valor) - cxp.Sum(x => x.Valor),
+                    DetallesCxC = cxc.OrderBy(x => x.Cuenta).ToList(),
+                    DetallesCxP = cxp.OrderBy(x => x.Cuenta).ToList()
+                };
             }, StringComparer.OrdinalIgnoreCase);
 
         foreach (var empresa in empresasConfiguradas)
         {
             if (!agrupado.ContainsKey(empresa))
             {
+                Console.WriteLine($"[Informe] Empresa '{empresa}' sin datos → agregada con totales 0");
                 agrupado[empresa] = new ConsolidadoItem { Empresa = empresa, TotalCxC = 0, TotalCxP = 0, Diferencia = 0 };
             }
         }
@@ -158,5 +207,49 @@
         Consolidado = agrupado.Values
             .OrderBy(x => x.Empresa)
             .ToList();
+
+        Console.WriteLine($"[Informe] Consolidado generado: {Consolidado.Count} empresas");
+        var totalCxc = Consolidado.Sum(x => x.DetallesCxC.Count);
+        var totalCxp = Consolidado.Sum(x => x.DetallesCxP.Count);
+        Console.WriteLine($"[Informe] Filas CxC generadas: {totalCxc}");
+        Console.WriteLine($"[Informe] Filas CxP generadas: {totalCxp}");
+    }
+
+    private void AplicarEstadoPersistido(PersistenceState savedState)
+    {
+        ExplorerState.FunctionsBaseUrl = savedState.FunctionsBaseUrl;
+        ExplorerState.Resultados = savedState.Resultados;
+        ExplorerState.Hallazgos = savedState.Hallazgos;
+        ExplorerState.DocumentosVerificados = savedState.DocumentosVerificados;
+        ExplorerState.Reciprocidades = savedState.Reciprocidades;
+        ExplorerState.EstadosHallazgos = savedState.EstadosHallazgos;
+        ExplorerState.ArchivosProcesados = savedState.ArchivosProcesados;
+        ExplorerState.ArchivosSeleccionados = savedState.ArchivosSeleccionados;
+        ExplorerState.TreeItems = savedState.TreeItems;
+        _savedLogs = savedState.Logs ?? new();
+    }
+
+    private async Task DescargarExcel()
+    {
+        var datosCxC = ConsolidadoFiltrado.SelectMany(x => x.DetallesCxC).ToList();
+        var datosCxP = ConsolidadoFiltrado.SelectMany(x => x.DetallesCxP).ToList();
+
+        Console.WriteLine($"[Informe] DescargarExcel - datosCxC: {datosCxC.Count} filas");
+        Console.WriteLine($"[Informe] DescargarExcel - datosCxP: {datosCxP.Count} filas");
+
+        if (datosCxC.Count > 0)
+        {
+            var tipoMuestra = datosCxC.First().Tipo;
+            Console.WriteLine($"[Informe] Muestra CxC: Tipo='{tipoMuestra}', Empresa='{datosCxC.First().Empresa}'");
+        }
+
+        if (datosCxP.Count > 0)
+        {
+            var tipoMuestra = datosCxP.First().Tipo;
+            Console.WriteLine($"[Informe] Muestra CxP: Tipo='{tipoMuestra}', Empresa='{datosCxP.First().Empresa}'");
+        }
+
+        await JSRuntime.InvokeVoidAsync("excelInterop.descargarInforme", datosCxC, datosCxP, "Informe_Imbalances.xlsx");
+        Console.WriteLine($"[Informe] Excel generado: {datosCxC.Count + datosCxP.Count} filas exportadas");
     }
 }

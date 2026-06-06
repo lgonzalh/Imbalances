@@ -12,4 +12,7 @@ public class RegistroContable
     public string ArchivoOrigen { get; set; } = string.Empty;
     public string HojaOrigen { get; set; } = string.Empty;
     public string TextoOrigen { get; set; } = string.Empty;
+    public string CompanyCode { get; set; } = string.Empty;
+    public string TradePartnerCode { get; set; } = string.Empty;
+    public string ConcOp { get; set; } = string.Empty;
 }

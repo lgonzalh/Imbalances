@@ -28,5 +28,11 @@ window.fileExplorer = {
         const input = document.getElementById(inputElementId);
         if (!input) return;
         input.value = '';
+    },
+    scrollToBottom: function (elementId) {
+        const el = document.getElementById(elementId);
+        if (el) {
+            el.scrollTop = el.scrollHeight;
+        }
     }
 };

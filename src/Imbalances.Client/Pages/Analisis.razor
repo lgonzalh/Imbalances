@@ -17,7 +17,8 @@
     </Toolbar>
 
     <ChildContent>
-        @if (!string.IsNullOrWhiteSpace(_initError))
+        <PasswordProtection Title="ACCESO RESTRINGIDO - ANÁLISIS" CorrectPassword="Juanes" OnUnlocked="@OnAnalisisUnlocked">
+            @if (!string.IsNullOrWhiteSpace(_initError))
         {
             <MudAlert Severity="Severity.Error" Variant="Variant.Filled">
                 @_initError
@@ -109,6 +110,7 @@
                 </AppGrid>
             </AppCard>
         }
+        </PasswordProtection>
     </ChildContent>
 </AppPageContainer>
 
@@ -126,6 +128,7 @@
     private string? _initError;
     private bool _hayResultados;
     private int _empresasConfiguradas;
+    private List<LogProceso> _savedLogs = new();
 
     private bool IsToolbarEnabled(string id)
     {
@@ -135,6 +138,8 @@
             _ => true
         };
     }
+
+    private Task OnAnalisisUnlocked() => Task.CompletedTask;
 
     private async Task HandleToolbar(string id)
     {
@@ -161,8 +166,17 @@
                 var savedState = await StatePersistence.CargarEstadoAsync();
                 if (savedState != null)
                 {
+                    Console.WriteLine("[Analisis] Estado persistido encontrado - aplicando restauracion");
                     AplicarEstadoPersistido(savedState);
                 }
+                else
+                {
+                    Console.WriteLine("[Analisis] No hay estado persistido para restaurar");
+                }
+            }
+            else
+            {
+                Console.WriteLine("[Analisis] TieneDatos en memoria - TreeItems: " + ExplorerState.TreeItems.Count + ", Resultados: " + ExplorerState.Resultados.Count + ", Hallazgos: " + ExplorerState.Hallazgos.Count);
             }
 
             _hayResultados = ExplorerState.Resultados.Any();
@@ -288,6 +302,7 @@
 
     private void AplicarEstadoPersistido(PersistenceState savedState)
     {
+        Console.WriteLine("[Analisis] Restaurando estado - TreeItems: " + (savedState.TreeItems?.Count ?? 0) + ", Resultados: " + savedState.Resultados.Count + ", Hallazgos: " + savedState.Hallazgos.Count + ", Reciprocidades: " + savedState.Reciprocidades.Count);
         ExplorerState.FunctionsBaseUrl = savedState.FunctionsBaseUrl;
         ExplorerState.Resultados = savedState.Resultados;
         ExplorerState.Hallazgos = savedState.Hallazgos;
@@ -296,11 +311,14 @@
         ExplorerState.EstadosHallazgos = savedState.EstadosHallazgos;
         ExplorerState.ArchivosProcesados = savedState.ArchivosProcesados;
         ExplorerState.ArchivosSeleccionados = savedState.ArchivosSeleccionados;
+        ExplorerState.TreeItems = savedState.TreeItems ?? new System.Collections.Generic.List<FileTreeItem>();
         ExplorerState.HaySesionPendiente = !savedState.SesionFinalizada && savedState.ArchivosProcesados.Any();
+        _savedLogs = savedState.Logs ?? new();
     }
 
     private async Task GuardarEstadoAsync()
     {
+        Console.WriteLine("[Persistencia] Analisis: guardando estado - TreeItems: " + ExplorerState.TreeItems.Count + ", Resultados: " + ExplorerState.Resultados.Count + ", Hallazgos: " + ExplorerState.Hallazgos.Count + ", Reciprocidades: " + ExplorerState.Reciprocidades.Count);
         await StatePersistence.GuardarEstadoAsync(new PersistenceState
         {
             FunctionsBaseUrl = ExplorerState.FunctionsBaseUrl,
@@ -311,6 +329,8 @@
             EstadosHallazgos = ExplorerState.EstadosHallazgos,
             ArchivosProcesados = ExplorerState.ArchivosProcesados,
             ArchivosSeleccionados = ExplorerState.ArchivosSeleccionados,
+            TreeItems = ExplorerState.TreeItems,
+            Logs = _savedLogs,
             SesionFinalizada = !ExplorerState.HaySesionPendiente
         });
     }

@@ -23,6 +23,14 @@ public class ConfigService : IConfigService
                     HojaBalance = "Balance de situación"
                 }
             },
+            AliasEmpresa = new List<EquivalenciaTercero>
+            {
+                new EquivalenciaTercero
+                {
+                    Alias = "FSR",
+                    Equivalentes = new List<string> { "FUNDACION SOLID RIVER" }
+                }
+            },
             Notas = new List<NotaConfig>
             {
                 new NotaConfig { Nota = "3", NombreHoja = "Nota 3" },
