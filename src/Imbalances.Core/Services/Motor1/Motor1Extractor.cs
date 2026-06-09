@@ -1,19 +1,21 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using Imbalances.Core.Models;
+using Imbalances.Core.Utils;
 
 namespace Imbalances.Core.Services;
 
 public class Motor1Extractor : IMotor1Extractor
 {
     private readonly IExcelProvider _excelProvider;
+    private readonly IEmpresaDetectionService _empresaDetectionService;
 
-    private const string DefaultHojaBalance = "Balance de situación";
+    private const string DefaultHojaBalance = "BALANCE DE SITUACION";
     private const string BalanceCuentaColumn = "C";
     private const string BalanceNotaColumn = "J";
     private const int BalanceScanMaxRows = 200;
@@ -23,24 +25,80 @@ public class Motor1Extractor : IMotor1Extractor
     private const int NotaHeaderScanMaxRows = 50;
     private const int NotaDataScanMaxRows = 200;
 
-    public Motor1Extractor(IExcelProvider excelProvider)
+    private sealed class ParsedNoteRow
     {
-        _excelProvider = excelProvider;
+        public int Fila { get; init; }
+        public string RawTexto { get; init; } = string.Empty;
+        public string TextoNormalizado { get; init; } = string.Empty;
+        public decimal? Valor { get; init; }
     }
 
-    public async Task<List<Movimiento>> ExtraerAsync(string filePath, Stream fileStream, ConfiguracionCore config, string periodo = "", Action<string>? onProgressLog = null)
+    private sealed class NoteCache
     {
+        public string ColEmpresa { get; init; } = string.Empty;
+        public string ColValor { get; init; } = string.Empty;
+        public int StartRow { get; init; }
+        public int EndRow { get; init; }
+        public List<ParsedNoteRow> Rows { get; init; } = new();
+    }
+
+    private sealed class HomologationIndex
+    {
+        public Dictionary<string, string> ExactMatch { get; }
+        public Dictionary<string, string> AliasMatch { get; }
+        public List<(EmpresaConfig Config, string NombreNormalizado)> Empresas { get; }
+        public int CacheHits { get; set; }
+
+        public HomologationIndex(
+            List<(EmpresaConfig Config, string NombreNormalizado)> empresas,
+            List<EquivalenciaTercero> aliasEmpresa)
+        {
+            Empresas = empresas;
+            ExactMatch = new Dictionary<string, string>(StringComparer.Ordinal);
+
+            foreach (var (config, nombre) in empresas)
+            {
+                if (!string.IsNullOrWhiteSpace(nombre) && !ExactMatch.ContainsKey(nombre))
+                {
+                    ExactMatch[nombre] = config.NombreEmpresa ?? config.NombreCarpeta ?? string.Empty;
+                }
+            }
+
+            AliasMatch = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (var entry in aliasEmpresa)
+            {
+                var aliasNorm = Normalizar(entry.Alias);
+                var destNorm = Normalizar(entry.NombreEmpresaDestino);
+                if (!string.IsNullOrWhiteSpace(aliasNorm) && !string.IsNullOrWhiteSpace(destNorm))
+                {
+                    AliasMatch[aliasNorm] = destNorm;
+                }
+            }
+        }
+    }
+
+    public Motor1Extractor(IExcelProvider excelProvider, IEmpresaDetectionService empresaDetectionService)
+    {
+        _excelProvider = excelProvider;
+        _empresaDetectionService = empresaDetectionService;
+    }
+
+    public async Task<List<Movimiento>> ExtraerAsync(string filePath, Stream fileStream, ConfiguracionCore config, string periodo = "", Action<string>? onProgressLog = null, bool diagnosticMode = true, Action<PipelineProfile>? onProfile = null)
+    {
+        var sw = Stopwatch.StartNew();
         var resultados = new List<Movimiento>();
         var nombreArchivo = Path.GetFileName(filePath);
 
         onProgressLog?.Invoke($"[Info] Procesando: {nombreArchivo}");
 
-        var empresa = config.Empresas.FirstOrDefault(e => filePath.Contains(e.NombreCarpeta, StringComparison.OrdinalIgnoreCase));
+        var swEmpresa = Stopwatch.StartNew();
+        var empresa = _empresaDetectionService.DetectarEmpresa(filePath, config, onProgressLog);
         if (empresa == null)
         {
             onProgressLog?.Invoke($"[Info] Empresa no detectada para {nombreArchivo} -> SKIP");
             return resultados;
         }
+        swEmpresa.Stop();
 
         var empresaOrigen = string.IsNullOrWhiteSpace(empresa.NombreEmpresa) ? empresa.NombreCarpeta : empresa.NombreEmpresa;
         onProgressLog?.Invoke($"[Info] Empresa detectada: {empresaOrigen}");
@@ -53,13 +111,28 @@ public class Motor1Extractor : IMotor1Extractor
             .Where(e => !string.IsNullOrWhiteSpace(e.NombreNormalizado))
             .ToList();
 
+        var homologIndex = new HomologationIndex(empresasNormalizadas, config.AliasEmpresa);
+
+        var swWorkbook = Stopwatch.StartNew();
         var workbook = await _excelProvider.OpenAsync(fileStream);
+        swWorkbook.Stop();
+
+        onProgressLog?.Invoke($"[Diagnostic] Hojas disponibles en el workbook ({workbook.Worksheets.Count()}):");
+        foreach (var ws in workbook.Worksheets)
+        {
+            var wsName = ws.Name ?? "(sin nombre)";
+            var wsNorm = Normalizar(wsName);
+            onProgressLog?.Invoke($"[Diagnostic]   Hoja: '{wsName}' -> Normalizada: '{wsNorm}'");
+        }
 
         var hojaBalanceNombre = string.IsNullOrWhiteSpace(empresa.HojaBalance) ? DefaultHojaBalance : empresa.HojaBalance.Trim();
+        var hojaBalanceNorm = Normalizar(hojaBalanceNombre);
+        onProgressLog?.Invoke($"[Diagnostic] Buscando hoja balance: '{hojaBalanceNombre}' -> Normalizada: '{hojaBalanceNorm}'");
+
         var sheetBalance = workbook.GetWorksheet(hojaBalanceNombre);
         if (sheetBalance == null)
         {
-            onProgressLog?.Invoke($"[Error] Hoja balance no encontrada: '{hojaBalanceNombre}'");
+            onProgressLog?.Invoke($"[Error] Hoja balance no encontrada: '{hojaBalanceNombre}' (normalizada: '{hojaBalanceNorm}')");
             return resultados;
         }
 
@@ -69,6 +142,10 @@ public class Motor1Extractor : IMotor1Extractor
             onProgressLog?.Invoke("[Info] No hay cuentas configuradas -> SKIP");
             return resultados;
         }
+
+        var swCuentas = Stopwatch.StartNew();
+        var noteCache = new Dictionary<string, NoteCache>(StringComparer.Ordinal);
+        var cuentaNotaMap = new List<(CuentaConfig Cuenta, string Nota, string NombreNota)>();
 
         foreach (var cuenta in cuentas)
         {
@@ -88,17 +165,102 @@ public class Motor1Extractor : IMotor1Extractor
 
             var nota = notaNum.ToString(CultureInfo.InvariantCulture);
             var nombreNota = $"Nota {nota}";
+
             var sheetNota = workbook.GetWorksheet(nombreNota);
             if (sheetNota == null)
                 continue;
 
-            // Use config columns if provided, else fallback to defaults
-            string colEmpresa = DefaultNotaEmpresaColumn; 
+            cuentaNotaMap.Add((cuenta, nota, nombreNota));
+
+            if (noteCache.ContainsKey(nota))
+                continue;
+
+            string colEmpresa = DefaultNotaEmpresaColumn;
             string colValor = !string.IsNullOrWhiteSpace(cuenta.ColumnaValor) ? cuenta.ColumnaValor : DefaultNotaValorColumn;
 
-            var movimientosCuenta = ExtraerDesdeNota(sheetNota, cuenta, nota, empresaOrigen, periodo, empresasNormalizadas, config.AliasEmpresa, nombreArchivo, nombreNota, onProgressLog, colEmpresa, colValor);
+            var (detectedEmp, detectedVal) = TryDetectColumns(sheetNota);
+            if (detectedVal != null && detectedVal != colValor)
+            {
+                onProgressLog?.Invoke($"[Info] {nombreNota}: columna de valores auto-detectada: {detectedVal} (configurada: {colValor})");
+                colValor = detectedVal;
+            }
+            if (detectedEmp != null && detectedEmp != colEmpresa)
+            {
+                onProgressLog?.Invoke($"[Info] {nombreNota}: columna de empresas auto-detectada: {detectedEmp} (configurada: {colEmpresa})");
+                colEmpresa = detectedEmp;
+            }
+
+            var startRow = BuscarInicioTabla(sheetNota, colEmpresa);
+            var limit = Math.Min(sheetNota.RowCount, startRow + NotaDataScanMaxRows);
+            onProgressLog?.Invoke($"[Info] {nombreNota}: InicioFila={startRow}, FinFila={limit}, RowCount={sheetNota.RowCount}");
+
+            var rows = new List<ParsedNoteRow>();
+            for (var fila = startRow; fila <= limit; fila++)
+            {
+                var row = sheetNota.GetRow(fila);
+                if (row == null)
+                    break;
+
+                var nombre = row.GetCell(colEmpresa);
+                var colEmpresaIdx = ColumnLetterToIndex(colEmpresa);
+
+                if (string.IsNullOrWhiteSpace(nombre))
+                {
+                    for (var offset = 1; offset <= 5; offset++)
+                    {
+                        var fallbackCol = ColumnIndexToLetter(colEmpresaIdx + offset);
+                        var fallbackNombre = row.GetCell(fallbackCol);
+                        if (!string.IsNullOrWhiteSpace(fallbackNombre))
+                        {
+                            nombre = fallbackNombre;
+                            break;
+                        }
+                    }
+                }
+
+                if (string.IsNullOrWhiteSpace(nombre))
+                {
+                    rows.Add(new ParsedNoteRow { Fila = fila, RawTexto = string.Empty, TextoNormalizado = string.Empty, Valor = null });
+                    continue;
+                }
+
+                if (EsGranTotal(nombre))
+                {
+                    rows.Add(new ParsedNoteRow { Fila = fila, RawTexto = nombre, TextoNormalizado = Normalizar(nombre), Valor = null });
+                    break;
+                }
+
+                var textoNormalizado = Normalizar(nombre);
+                var tieneValor = TryParseDecimal(row.GetCell(colValor), out var valor);
+
+                rows.Add(new ParsedNoteRow
+                {
+                    Fila = fila,
+                    RawTexto = nombre,
+                    TextoNormalizado = textoNormalizado,
+                    Valor = tieneValor ? valor : null
+                });
+            }
+
+            noteCache[nota] = new NoteCache
+            {
+                ColEmpresa = colEmpresa,
+                ColValor = colValor,
+                StartRow = startRow,
+                EndRow = limit,
+                Rows = rows
+            };
+        }
+        swCuentas.Stop();
+
+        var swProcesamiento = Stopwatch.StartNew();
+        foreach (var (cuenta, nota, nombreNota) in cuentaNotaMap)
+        {
+            var cache = noteCache[nota];
+            var movimientosCuenta = ExtraerDesdeCache(cache, cuenta, nota, empresaOrigen, periodo, homologIndex, nombreArchivo, nombreNota, onProgressLog, diagnosticMode);
             resultados.AddRange(movimientosCuenta);
         }
+        swProcesamiento.Stop();
 
         var dedup = new Dictionary<string, Movimiento>(StringComparer.Ordinal);
         foreach (var m in resultados)
@@ -115,16 +277,192 @@ public class Motor1Extractor : IMotor1Extractor
         if (fsrFileMovements.Count > 0)
         {
             var fsrFileTotal = fsrFileMovements.Sum(m => m.Valor);
-            onProgressLog?.Invoke($"[Info] --- Métricas finales FSR {nombreArchivo} ---");
+            onProgressLog?.Invoke($"[Info] --- Metrics finales FSR {nombreArchivo} ---");
             onProgressLog?.Invoke($"[Info]   Movimientos FSR generados: {fsrFileMovements.Count}");
             foreach (var m in fsrFileMovements)
             {
-                onProgressLog?.Invoke($"[Info]     • {m.EmpresaOrigen} -> {m.EmpresaContraparte} | {m.Tipo} | {m.Valor:N2}");
+                onProgressLog?.Invoke($"[Info]     * {m.EmpresaOrigen} -> {m.EmpresaContraparte} | {m.Tipo} | {m.Valor:N2}");
             }
             onProgressLog?.Invoke($"[Info]   Valor total FSR generado: {fsrFileTotal:N2}");
         }
 
+        sw.Stop();
+
+        if (onProfile != null)
+        {
+            var profile = new PipelineProfile
+            {
+                Archivo = nombreArchivo,
+                Empresa = empresaOrigen,
+                DeteccionEmpresaMs = swEmpresa.ElapsedMilliseconds,
+                LecturaWorkbookMs = swWorkbook.ElapsedMilliseconds,
+                DescubrimientoCuentasMs = swCuentas.ElapsedMilliseconds,
+                LecturaNotasMs = 0,
+                ProcesamientoMovimientosMs = swProcesamiento.ElapsedMilliseconds,
+                TotalMs = sw.ElapsedMilliseconds,
+                MovimientosGenerados = dedupList.Count,
+                NotasProcesadas = noteCache.Count
+            };
+            onProgressLog?.Invoke($"[Perfil] {nombreArchivo}: empresa={swEmpresa.ElapsedMilliseconds}ms, workbook={swWorkbook.ElapsedMilliseconds}ms, cuentas={swCuentas.ElapsedMilliseconds}ms, procesamiento={swProcesamiento.ElapsedMilliseconds}ms, total={sw.ElapsedMilliseconds}ms");
+            onProfile(profile);
+        }
+
         return dedupList;
+    }
+
+    private static List<Movimiento> ExtraerDesdeCache(
+        NoteCache cache,
+        CuentaConfig cuenta,
+        string nota,
+        string empresaOrigen,
+        string periodo,
+        HomologationIndex homologIndex,
+        string nombreArchivo,
+        string nombreHoja,
+        Action<string>? onProgressLog,
+        bool diagnosticMode = true)
+    {
+        var resultados = new List<Movimiento>();
+        string? rubroActual = null;
+        var totalRowsEvaluated = 0;
+        var totalRowsAccepted = 0;
+        var totalRowsDiscarded = 0;
+        var fsrRowsDetected = 0;
+        var fsrMovements = new List<Movimiento>();
+
+        void LogPerRow(string message)
+        {
+            if (diagnosticMode)
+                onProgressLog?.Invoke(message);
+        }
+
+        foreach (var row in cache.Rows)
+        {
+            var nombre = row.RawTexto;
+
+            if (string.IsNullOrWhiteSpace(nombre))
+            {
+                LogPerRow($"[Fila {row.Fila}] Vacio: sin texto en columna empresa");
+                continue;
+            }
+
+            LogPerRow($@"[Fila {row.Fila}] Texto=""{nombre}""");
+
+            if (EsGranTotal(nombre))
+            {
+                LogPerRow($"[Fila {row.Fila}] -> GRAN TOTAL: fin de nota");
+                break;
+            }
+
+            if (row.Valor == null)
+            {
+                if (!string.IsNullOrWhiteSpace(row.TextoNormalizado))
+                {
+                    rubroActual = row.TextoNormalizado;
+                    LogPerRow($"[Fila {row.Fila}] RUBRO detectado: \"{row.TextoNormalizado}\"");
+                }
+                continue;
+            }
+
+            var textoNormalizado = row.TextoNormalizado;
+            if (string.IsNullOrWhiteSpace(textoNormalizado))
+                continue;
+
+            totalRowsEvaluated++;
+
+            if (nombre.Contains("(FSR)", StringComparison.OrdinalIgnoreCase) ||
+                nombre.Trim().Equals("FSR", StringComparison.OrdinalIgnoreCase))
+            {
+                fsrRowsDetected++;
+            }
+
+            if (EsFilaEstructural(textoNormalizado))
+            {
+                LogPerRow($"[Fila {row.Fila}] \"{nombre}\" -> DESCARTADA (estructural)");
+                totalRowsDiscarded++;
+                continue;
+            }
+
+            if (EsSubEntry(textoNormalizado, homologIndex.Empresas))
+            {
+                LogPerRow($"[Fila {row.Fila}] \"{nombre}\" -> DESCARTADA (subentrada)");
+                totalRowsDiscarded++;
+                continue;
+            }
+
+            if (EsRubro(textoNormalizado))
+            {
+                rubroActual = textoNormalizado;
+                LogPerRow($"[Fila {row.Fila}] RUBRO detectado: \"{textoNormalizado}\"");
+                continue;
+            }
+
+            var contraparte = HomologarEmpresaIndex(textoNormalizado, homologIndex);
+
+            if (string.IsNullOrEmpty(contraparte))
+            {
+                LogPerRow($"[Fila {row.Fila}] \"{nombre}\" -> DESCARTADA (no homologada)");
+                totalRowsDiscarded++;
+                continue;
+            }
+
+            LogPerRow($"[Fila {row.Fila}] CONTRAPARTE detectada: \"{contraparte}\"");
+
+            var mov = new Movimiento
+            {
+                EmpresaOrigen = empresaOrigen,
+                EmpresaContraparte = contraparte,
+                Tipo = cuenta.Tipo,
+                Cuenta = rubroActual ?? cuenta.NombreCuenta,
+                Valor = row.Valor.Value,
+                Nota = nota,
+                Periodo = periodo
+            };
+
+            if (MovimientoValido(mov, onProgressLog, nombreHoja, nombreArchivo))
+            {
+                LogPerRow($"[Fila {row.Fila}] MOVIMIENTO generado: {empresaOrigen} -> {contraparte} | {cuenta.Tipo} | {rubroActual ?? cuenta.NombreCuenta} | {row.Valor.Value:N2}");
+                resultados.Add(mov);
+                totalRowsAccepted++;
+
+                if (contraparte.Contains("FUNDACION SOLID RIVER", StringComparison.OrdinalIgnoreCase))
+                {
+                    fsrMovements.Add(mov);
+                    onProgressLog?.Invoke($"[Info] Contraparte especial FSR homologada correctamente: {empresaOrigen} -> {contraparte} | {mov.Tipo} | {mov.Valor:N2}");
+                }
+            }
+            else
+            {
+                LogPerRow($"[Fila {row.Fila}] \"{nombre}\" -> DESCARTADA (movimiento invalido)");
+                totalRowsDiscarded++;
+            }
+        }
+
+        if (resultados.Count == 0 && totalRowsEvaluated == 0)
+        {
+            onProgressLog?.Invoke($"[Sugerencia] En {nombreHoja}, no se encontraron filas con datos procesables. Revise la configuracion de columnas.");
+        }
+
+        onProgressLog?.Invoke($"[Info] {nombreHoja}: resumen: filasExtraidas={resultados.Count}, evaluadas={totalRowsEvaluated}, aceptadas={totalRowsAccepted}, descartadas={totalRowsDiscarded}");
+        onProgressLog?.Invoke($"[Info] Nota {nota}: filas extraidas {resultados.Count}");
+
+        var fsrTotal = fsrMovements.Sum(m => m.Valor);
+        if (fsrRowsDetected > 0 || fsrMovements.Count > 0)
+        {
+            onProgressLog?.Invoke($"[Info] --- Diagnostico FSR {nombreHoja} ---");
+            onProgressLog?.Invoke($"[Info]   Filas evaluadas: {totalRowsEvaluated}");
+            onProgressLog?.Invoke($"[Info]   Filas aceptadas: {totalRowsAccepted}");
+            onProgressLog?.Invoke($"[Info]   Filas descartadas: {totalRowsDiscarded}");
+            onProgressLog?.Invoke($"[Info]   Filas detectadas con (FSR): {fsrRowsDetected}");
+            onProgressLog?.Invoke($"[Info]   Movimientos FSR generados: {fsrMovements.Count}");
+            foreach (var m in fsrMovements)
+            {
+                onProgressLog?.Invoke($"[Info]     * {m.EmpresaOrigen} -> {m.EmpresaContraparte} | {m.Tipo} | {m.Valor:N2}");
+            }
+            onProgressLog?.Invoke($"[Info]   Valor total FSR: {fsrTotal:N2}");
+        }
+
+        return resultados;
     }
 
     private static int? BuscarFilaExacta(IExcelWorksheet sheet, string col, string texto, int maxRows)
@@ -163,193 +501,6 @@ public class Motor1Extractor : IMotor1Extractor
             return bestRow;
 
         return null;
-    }
-
-    private static List<Movimiento> ExtraerDesdeNota(
-          IExcelWorksheet sheetNota,
-          CuentaConfig cuenta,
-          string nota,
-          string empresaOrigen,
-          string periodo,
-          List<(EmpresaConfig Config, string NombreNormalizado)> empresasNormalizadas,
-          List<EquivalenciaTercero> aliasEmpresa,
-          string nombreArchivo,
-          string nombreHoja,
-          Action<string>? onProgressLog,
-          string colEmpresa,
-          string colValor)
-    {
-        var resultados = new List<Movimiento>();
-
-        var (detectedEmp, detectedVal) = TryDetectColumns(sheetNota);
-        if (detectedVal != null && detectedVal != colValor)
-        {
-            onProgressLog?.Invoke($"[Info] {nombreHoja}: columna de valores auto-detectada: {detectedVal} (configurada: {colValor})");
-            colValor = detectedVal;
-        }
-        if (detectedEmp != null && detectedEmp != colEmpresa)
-        {
-            onProgressLog?.Invoke($"[Info] {nombreHoja}: columna de empresas auto-detectada: {detectedEmp} (configurada: {colEmpresa})");
-            colEmpresa = detectedEmp;
-        }
-
-        var startRow = BuscarInicioTabla(sheetNota, colEmpresa);
-        var limit = Math.Min(sheetNota.RowCount, startRow + NotaDataScanMaxRows);
-
-        string? rubroActual = null;
-        for (var fila = startRow; fila <= limit; fila++)
-        {
-            var row = sheetNota.GetRow(fila);
-            if (row == null) break;
-
-            var nombre = row.GetCell(colEmpresa);
-            if (string.IsNullOrWhiteSpace(nombre)) continue;
-            if (EsGranTotal(nombre)) break;
-
-            if (!TryParseDecimal(row.GetCell(colValor), out _))
-            {
-                var texto = Normalizar(nombre);
-                if (!string.IsNullOrWhiteSpace(texto))
-                {
-                    rubroActual = texto;
-                }
-                break;
-            }
-        }
-
-        var totalRowsEvaluated = 0;
-        var totalRowsAccepted = 0;
-        var totalRowsDiscarded = 0;
-        var fsrRowsDetected = 0;
-        var fsrMovements = new List<Movimiento>();
-
-        for (var fila = startRow; fila <= limit; fila++)
-        {
-            var row = sheetNota.GetRow(fila);
-            if (row == null)
-                break;
-
-            var nombre = row.GetCell(colEmpresa);
-            if (string.IsNullOrWhiteSpace(nombre))
-                continue;
-
-            if (EsGranTotal(nombre))
-                break;
-
-            var tieneValor = TryParseDecimal(row.GetCell(colValor), out var valor);
-
-            if (!tieneValor)
-            {
-                var texto = Normalizar(nombre);
-                if (!string.IsNullOrWhiteSpace(texto))
-                    rubroActual = texto;
-                continue;
-            }
-
-            var textoNormalizado = Normalizar(nombre);
-            if (string.IsNullOrWhiteSpace(textoNormalizado))
-                continue;
-
-            totalRowsEvaluated++;
-
-            if (nombre.Contains("(FSR)", StringComparison.OrdinalIgnoreCase) ||
-                nombre.Trim().Equals("FSR", StringComparison.OrdinalIgnoreCase))
-            {
-                fsrRowsDetected++;
-            }
-
-            if (EsFilaEstructural(textoNormalizado))
-            {
-                onProgressLog?.Invoke($"[Fila {fila}] \"{nombre}\" -> DESCARTADA (estructural)");
-                totalRowsDiscarded++;
-                continue;
-            }
-
-            if (EsSubEntry(textoNormalizado, empresasNormalizadas))
-            {
-                onProgressLog?.Invoke($"[Fila {fila}] \"{nombre}\" -> DESCARTADA (subentrada)");
-                totalRowsDiscarded++;
-                continue;
-            }
-
-            if (EsRubro(textoNormalizado))
-            {
-                onProgressLog?.Invoke($"[Fila {fila}] \"{nombre}\" -> DESCARTADA (rubro)");
-                totalRowsDiscarded++;
-                continue;
-            }
-
-            var contraparte = HomologarEmpresa(textoNormalizado, empresasNormalizadas, aliasEmpresa);
-
-            if (string.IsNullOrEmpty(contraparte))
-            {
-                onProgressLog?.Invoke($"[Fila {fila}] \"{nombre}\" -> DESCARTADA (no homologada)");
-                totalRowsDiscarded++;
-                continue;
-            }
-
-            var mov = new Movimiento
-            {
-                EmpresaOrigen = empresaOrigen,
-                EmpresaContraparte = contraparte,
-                Tipo = cuenta.Tipo,
-                Cuenta = rubroActual ?? cuenta.NombreCuenta,
-                Valor = valor,
-                Nota = nota,
-                Periodo = periodo
-            };
-
-            if (MovimientoValido(mov, onProgressLog, nombreHoja, nombreArchivo))
-            {
-                onProgressLog?.Invoke($"[Fila {fila}] \"{nombre}\" -> ACEPTADA (contraparte: {contraparte} | valor: {valor:N2})");
-                resultados.Add(mov);
-                totalRowsAccepted++;
-
-                if (contraparte.Contains("FUNDACION SOLID RIVER", StringComparison.OrdinalIgnoreCase))
-                {
-                    fsrMovements.Add(mov);
-                    onProgressLog?.Invoke($"[Info] Contraparte especial FSR homologada correctamente: {empresaOrigen} -> {contraparte} | {mov.Tipo} | {mov.Valor:N2}");
-                }
-            }
-            else
-            {
-                onProgressLog?.Invoke($"[Fila {fila}] \"{nombre}\" -> DESCARTADA (movimiento invalido)");
-                totalRowsDiscarded++;
-            }
-        }
-
-        if (resultados.Count == 0 && totalRowsEvaluated == 0)
-        {
-            var (suggEmp, suggVal) = TryDetectColumns(sheetNota);
-            if (suggVal != null && suggVal != colValor)
-            {
-                onProgressLog?.Invoke($"[Sugerencia] En {nombreHoja}, la columna configurada ({colValor}) no parece contener datos. Se detectó información en la columna {suggVal}. Por favor, actualice la configuración.");
-            }
-            else if (suggEmp != null && suggEmp != colEmpresa)
-            {
-                onProgressLog?.Invoke($"[Sugerencia] En {nombreHoja}, la columna de empresa configurada ({colEmpresa}) no parece correcta. Se detectó información en la columna {suggEmp}.");
-            }
-        }
-
-        onProgressLog?.Invoke($"[Info] Nota {nota}: filas extraídas {resultados.Count}");
-
-        var fsrTotal = fsrMovements.Sum(m => m.Valor);
-        if (fsrRowsDetected > 0 || fsrMovements.Count > 0)
-        {
-            onProgressLog?.Invoke($"[Info] --- Diagnóstico FSR {nombreHoja} ---");
-            onProgressLog?.Invoke($"[Info]   Filas evaluadas: {totalRowsEvaluated}");
-            onProgressLog?.Invoke($"[Info]   Filas aceptadas: {totalRowsAccepted}");
-            onProgressLog?.Invoke($"[Info]   Filas descartadas: {totalRowsDiscarded}");
-            onProgressLog?.Invoke($"[Info]   Filas detectadas con (FSR): {fsrRowsDetected}");
-            onProgressLog?.Invoke($"[Info]   Movimientos FSR generados: {fsrMovements.Count}");
-            foreach (var m in fsrMovements)
-            {
-                onProgressLog?.Invoke($"[Info]     • {m.EmpresaOrigen} -> {m.EmpresaContraparte} | {m.Tipo} | {m.Valor:N2}");
-            }
-            onProgressLog?.Invoke($"[Info]   Valor total FSR: {fsrTotal:N2}");
-        }
-
-        return resultados;
     }
 
     private static int BuscarInicioTabla(IExcelWorksheet sheet, string colEmpresa)
@@ -424,6 +575,16 @@ public class Motor1Extractor : IMotor1Extractor
         return letter;
     }
 
+    private static int ColumnLetterToIndex(string letter)
+    {
+        var result = 0;
+        foreach (var ch in letter.ToUpperInvariant())
+        {
+            result = result * 26 + (ch - 'A' + 1);
+        }
+        return result - 1;
+    }
+
     private static bool EsGranTotal(string texto)
     {
         if (string.IsNullOrWhiteSpace(texto))
@@ -488,31 +649,28 @@ public class Motor1Extractor : IMotor1Extractor
             e.NombreNormalizado.StartsWith(baseText + " "));
     }
 
-    private static string HomologarEmpresa(
+    private static string HomologarEmpresaIndex(
         string textoNormalizado,
-        List<(EmpresaConfig Config, string NombreNormalizado)> empresas,
-        List<EquivalenciaTercero> aliasEmpresa)
+        HomologationIndex index)
     {
         if (string.IsNullOrWhiteSpace(textoNormalizado))
             return string.Empty;
 
-        // Level 1: Alias / Equivalencies
-        foreach (var entry in aliasEmpresa)
+        // Level 1: Alias match O(1)
+        if (index.AliasMatch.TryGetValue(textoNormalizado, out var aliasResult))
         {
-            var aliasNorm = Normalizar(entry.Alias);
-            if (textoNormalizado == aliasNorm)
-            {
-                return Normalizar(entry.NombreEmpresaDestino);
-            }
+            index.CacheHits++;
+            return aliasResult;
         }
 
-        // Level 2: Exact match
-        var exactMatch = empresas.FirstOrDefault(e => e.NombreNormalizado == textoNormalizado);
-        if (exactMatch.Config != null)
-            return exactMatch.Config.NombreEmpresa ?? exactMatch.Config.NombreCarpeta;
+        // Level 2: Exact match O(1)
+        if (index.ExactMatch.TryGetValue(textoNormalizado, out var exactResult))
+        {
+            return exactResult;
+        }
 
-        // Level 3: Fuzzy match (85%+)
-        var bestFuzzy = empresas
+        // Level 3: Fuzzy match (85%+) - only when exact fails
+        var bestFuzzy = index.Empresas
             .Select(e => (Config: e.Config, Similitud: LevenshteinSimilarity(textoNormalizado, e.NombreNormalizado)))
             .Where(e => e.Similitud >= 0.85)
             .OrderByDescending(e => e.Similitud)
@@ -523,7 +681,7 @@ public class Motor1Extractor : IMotor1Extractor
 
         // Level 4: Low-confidence match (70-84.99%)
         var posibles = new List<(EmpresaConfig Config, double Similitud, string Normalizado)>();
-        foreach (var e in empresas)
+        foreach (var e in index.Empresas)
         {
             var sim = LevenshteinSimilarity(textoNormalizado, e.NombreNormalizado);
             if (sim >= 0.70)
@@ -531,10 +689,7 @@ public class Motor1Extractor : IMotor1Extractor
         }
 
         if (posibles.Count > 0)
-        {
-            // Warning is handled in the calling loop via onProgressLog, but we return null to avoid wrong insertion
             return string.Empty;
-        }
 
         return string.Empty;
     }
@@ -624,43 +779,7 @@ public class Motor1Extractor : IMotor1Extractor
         if (string.IsNullOrWhiteSpace(texto))
             return string.Empty;
 
-        var result = texto.Trim().ToUpperInvariant();
-        result = result.Normalize(NormalizationForm.FormD);
-        var sb = new StringBuilder(result.Length);
-        var prevSpace = false;
-
-        foreach (var ch in result)
-        {
-            var uc = CharUnicodeInfo.GetUnicodeCategory(ch);
-            if (uc == UnicodeCategory.NonSpacingMark)
-                continue;
-
-            if (char.IsWhiteSpace(ch))
-            {
-                if (!prevSpace)
-                {
-                    sb.Append(' ');
-                    prevSpace = true;
-                }
-                continue;
-            }
-
-            if (char.IsLetterOrDigit(ch))
-            {
-                prevSpace = false;
-                sb.Append(ch);
-            }
-            else
-            {
-                if (!prevSpace)
-                {
-                    sb.Append(' ');
-                    prevSpace = true;
-                }
-            }
-        }
-
-        var normalized = sb.ToString().Trim().Normalize(NormalizationForm.FormC);
+        var normalized = EmpresaDetectionService.NormalizeForComparison(texto);
         if (string.IsNullOrEmpty(normalized))
             return string.Empty;
 

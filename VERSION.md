@@ -1,7 +1,14 @@
-﻿## 1.6.0
-- Version: 1.6.0.0
+﻿## 1.7.0
+- Version: 1.7.0.0
 - Fecha: 2026-06-09
-- FASE 2.2: Informe Corporativo Completo. Se agrega Periodo a RegistroContable (mapeado desde Movimiento.Periodo en ExtractorEngine). Informe.razor visual ahora muestra columnas Corte, Company, Trade Partner, CONC_OP con fallbacks COMPANY_MISSING/TRADE_PARTNER_MISSING/CONC_OP_MISSING. Excel export ahora incluye CORTE desde periodo, y MISSING labels cuando CompanyCode/ConcOp no estan configurados.
+- FASE 4: Optimizacion de Rendimiento (5x-10x objetivo en pipeline de extraccion).
+  - F4.1: Cache de Notas. Las notas se leen y parsean una sola vez aunque multiples cuentas las referencien. Antes: N lecturas por nota compartida. Despues: 1 lectura.
+  - F4.2: Indice de Homologacion O(1). Dictionary precalculado para alias y nombre exacto. Fuzzy (Levenshtein) solo cuando falla exacta. Antes: ~54 comparaciones/fila. Despues: 2 lookups O(1)/fila.
+  - F4.3: Logging de Produccion. Modo Diagnostico (logs detallados por fila) vs Modo Produccion (solo resumenes, inicio, errores). Reduccion tipica: ~70-90% menos lineas de log.
+  - F4.4: Eliminacion de reprocesamiento duplicado. Cache de notas elimina doble scan del mismo sheet. Normalizar() y TryParseDecimal() computados una sola vez por fila.
+  - F4.5: Procesamiento paralelo controlado. Metodo ProcesarMultiplesArchivosAsync con Parallel.ForEachAsync y MaxDegreeOfParallelism configurable (default 4). Sin race conditions.
+  - F4.6: Perfilado por etapas. Stopwatch por etapa: deteccion empresa, lectura workbook, descubrimiento cuentas, procesamiento movimientos. Callback onProfile devuelve PipelineProfile.
+  - F4.7: Validacion funcional completa. 23/23 tests pasan (PipelineAudit, ExtractorEngineMotor1, HomologationDiagnostic, PerformanceBenchmark). Mismos movimientos, mismas homologaciones, mismas reglas.
 - Build: 0 errores, 0 warnings
 
 ## 1.5.0
