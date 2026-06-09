@@ -316,12 +316,12 @@ window.excelInterop = {
             const rows = [headers];
             for (const item of (datos || [])) {
                 rows.push([
-                    '',
-                    item.companyCode || '',
-                    item.empresa || '',
-                    item.tradePartnerCode || '',
-                    item.empresaContraparte || '',
-                    item.concOp || '',
+                    item.periodo || '',                         // CORTE
+                    item.companyCode || 'COMPANY_MISSING',      // Company
+                    item.empresa || '',                         // Nom_company
+                    item.tradePartnerCode || 'TRADE_PARTNER_MISSING', // Trade Partner
+                    item.empresaContraparte || '',              // Nom_Trade_P
+                    item.concOp || 'CONC_OP_MISSING',           // Conc_op
                     tipoLetra,
                     typeof item.valor === 'number' ? item.valor : Number(item.valor || 0)
                 ]);

@@ -58,7 +58,11 @@
                             <AppCard Title="Detalle de Activos (CxC)" Collapsible="false">
                                 <AppGrid TItem="RegistroContable" Items="@item.DetallesCxC" Selectable="false">
                                     <Columns>
-                                        <AppGridColumn TItem="RegistroContable" Title="Rubro Activo" ValueSelector="x => x.Cuenta" />
+                                        <AppGridColumn TItem="RegistroContable" Title="Corte" ValueSelector="x => x.Periodo" />
+                                        <AppGridColumn TItem="RegistroContable" Title="Company" ValueSelector="x => CompanyLabel(x.CompanyCode)" />
+                                        <AppGridColumn TItem="RegistroContable" Title="Trade Partner" ValueSelector="x => TradePartnerLabel(x.TradePartnerCode)" />
+                                        <AppGridColumn TItem="RegistroContable" Title="CONC_OP" ValueSelector="x => ConcOpLabel(x.ConcOp)" />
+                                        <AppGridColumn TItem="RegistroContable" Title="Rubro" ValueSelector="x => x.Cuenta" />
                                         <AppGridColumn TItem="RegistroContable" Title="Nota" ValueSelector="x => x.Nota" />
                                         <AppGridColumn TItem="RegistroContable" Title="Valor" ValueSelector="x => x.Valor" />
                                     </Columns>
@@ -71,7 +75,11 @@
                             <AppCard Title="Detalle de Pasivos (CxP)" Collapsible="false">
                                 <AppGrid TItem="RegistroContable" Items="@item.DetallesCxP" Selectable="false">
                                     <Columns>
-                                        <AppGridColumn TItem="RegistroContable" Title="Rubro Pasivo" ValueSelector="x => x.Cuenta" />
+                                        <AppGridColumn TItem="RegistroContable" Title="Corte" ValueSelector="x => x.Periodo" />
+                                        <AppGridColumn TItem="RegistroContable" Title="Company" ValueSelector="x => CompanyLabel(x.CompanyCode)" />
+                                        <AppGridColumn TItem="RegistroContable" Title="Trade Partner" ValueSelector="x => TradePartnerLabel(x.TradePartnerCode)" />
+                                        <AppGridColumn TItem="RegistroContable" Title="CONC_OP" ValueSelector="x => ConcOpLabel(x.ConcOp)" />
+                                        <AppGridColumn TItem="RegistroContable" Title="Rubro" ValueSelector="x => x.Cuenta" />
                                         <AppGridColumn TItem="RegistroContable" Title="Nota" ValueSelector="x => x.Nota" />
                                         <AppGridColumn TItem="RegistroContable" Title="Valor" ValueSelector="x => x.Valor" />
                                     </Columns>
@@ -252,4 +260,8 @@
         await JSRuntime.InvokeVoidAsync("excelInterop.descargarInforme", datosCxC, datosCxP, "Informe_Imbalances.xlsx");
         Console.WriteLine($"[Informe] Excel generado: {datosCxC.Count + datosCxP.Count} filas exportadas");
     }
+
+    private static string CompanyLabel(string code) => string.IsNullOrWhiteSpace(code) ? "COMPANY_MISSING" : code;
+    private static string TradePartnerLabel(string code) => string.IsNullOrWhiteSpace(code) ? "TRADE_PARTNER_MISSING" : code;
+    private static string ConcOpLabel(string code) => string.IsNullOrWhiteSpace(code) ? "CONC_OP_MISSING" : code;
 }
