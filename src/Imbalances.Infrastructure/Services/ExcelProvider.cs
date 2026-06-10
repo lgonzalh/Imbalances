@@ -39,8 +39,21 @@ public class ExcelWorkbookWrapper : IExcelWorkbook
 
     public IExcelWorksheet? GetWorksheet(string name)
     {
+        // Try exact match first (case-insensitive, DataSet default)
         var table = _dataSet.Tables[name];
-        return table != null ? new ExcelWorksheetWrapper(table) : null;
+        if (table != null)
+            return new ExcelWorksheetWrapper(table);
+
+        // Fallback: normalized comparison (accent-insensitive, punctuation-insensitive)
+        var nameNorm = EmpresaDetectionService.NormalizeForComparison(name);
+        foreach (var dt in _dataSet.Tables.Cast<DataTable>())
+        {
+            var dtNorm = EmpresaDetectionService.NormalizeForComparison(dt.TableName);
+            if (dtNorm == nameNorm)
+                return new ExcelWorksheetWrapper(dt);
+        }
+
+        return null;
     }
 }
 

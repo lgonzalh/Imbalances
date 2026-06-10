@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Threading.Tasks;
@@ -52,6 +52,7 @@ public class AnalisisPageTests
         ctx.Services.AddScoped<ExplorerStateService>();
         ctx.Services.AddScoped<IStatePersistenceService>(_ => new FakeStatePersistenceService());
         ctx.Services.AddScoped<IConfigService>(_ => new FakeConfigService());
+        ctx.Services.AddScoped<IEmpresaDetectionService, EmpresaDetectionService>();
         ctx.Services.AddScoped<IAuditoriaService, AuditoriaService>();
         ctx.Services.AddScoped<UiFeedbackService>();
 

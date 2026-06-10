@@ -12,7 +12,7 @@ public class CuentaConfig
     public string Tipo { get; set; } = "CxC"; // CxC | CxP
 
     [JsonPropertyName("columnaValor")]
-    public string ColumnaValor { get; set; } = "C";
+    public string ColumnaValor { get; set; } = string.Empty;
 
     [JsonPropertyName("columnaNota")]
     public string ColumnaNota { get; set; } = "J";

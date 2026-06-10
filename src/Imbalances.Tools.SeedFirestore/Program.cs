@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using Imbalances.Core.Services;
 using System.Text;
 using Google.Cloud.Firestore;
 
@@ -136,49 +136,5 @@ static string? GetOptional(Dictionary<string, string?> argsMap, string key)
 
 static string NormalizeEmpresaId(string input)
 {
-    var upper = input.Trim().ToUpperInvariant();
-
-    var decomposed = upper.Normalize(NormalizationForm.FormD);
-    var sb = new StringBuilder(decomposed.Length);
-    foreach (var ch in decomposed)
-    {
-        var category = CharUnicodeInfo.GetUnicodeCategory(ch);
-        if (category == UnicodeCategory.NonSpacingMark)
-        {
-            continue;
-        }
-
-        if (char.IsLetterOrDigit(ch) || char.IsWhiteSpace(ch))
-        {
-            sb.Append(ch);
-        }
-    }
-
-    var cleaned = sb.ToString().Normalize(NormalizationForm.FormC);
-    var collapsedSpaces = CollapseSpaces(cleaned);
-    return collapsedSpaces;
-}
-
-static string CollapseSpaces(string input)
-{
-    var sb = new StringBuilder(input.Length);
-    var prevIsSpace = false;
-    foreach (var ch in input)
-    {
-        var isSpace = char.IsWhiteSpace(ch);
-        if (isSpace)
-        {
-            if (!prevIsSpace)
-            {
-                sb.Append(' ');
-            }
-            prevIsSpace = true;
-            continue;
-        }
-
-        prevIsSpace = false;
-        sb.Append(ch);
-    }
-
-    return sb.ToString().Trim();
+    return Imbalances.Core.Services.EmpresaDetectionService.NormalizeForComparison(input);
 }

@@ -15,4 +15,5 @@ public class RegistroContable
     public string CompanyCode { get; set; } = string.Empty;
     public string TradePartnerCode { get; set; } = string.Empty;
     public string ConcOp { get; set; } = string.Empty;
+    public string Periodo { get; set; } = string.Empty;
 }

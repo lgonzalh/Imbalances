@@ -98,7 +98,8 @@
     private void MarcarCambios()
     {
         _hasUnsavedChanges = true;
-        _ = JS.InvokeVoidAsync("eval", "window._imbalancesUnsavedChanges = true");
+        try { _ = JS.InvokeVoidAsync("eval", "window._imbalancesUnsavedChanges = true"); } catch { }
+        StateHasChanged();
     }
 
     protected override async Task OnInitializedAsync()
@@ -182,15 +183,20 @@
 
     private async Task Save()
     {
-        var errores = Validar(_config);
+        var (errores, advertencias) = Validar(_config);
         if (errores.Count > 0)
         {
-            Ui.ShowWarning($"Validación: se encontraron {errores.Count} error(es).");
+            Ui.ShowWarning($"Validación: se encontraron {errores.Count} error(es) bloqueantes.");
             foreach (var e in errores.Take(10))
             {
                 Ui.ShowWarning(e);
             }
             return;
+        }
+
+        foreach (var w in advertencias.Take(10))
+        {
+            Ui.ShowWarning(w);
         }
 
         try
@@ -379,13 +385,55 @@
         public ConfiguracionCore? Config { get; set; }
     }
 
-    private static List<string> Validar(ConfiguracionCore config)
+    private static (List<string> Errores, List<string> Advertencias) Validar(ConfiguracionCore config)
     {
         var errores = new List<string>();
+        var advertencias = new List<string>();
+
+        var companyCodeMap = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        var concOpMap = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var e in config.Empresas)
         {
-            if (string.IsNullOrWhiteSpace(e.NombreCarpeta)) errores.Add("Empresa: falta 'Nombre carpeta'.");
+            var nombre = !string.IsNullOrWhiteSpace(e.NombreEmpresa)
+                ? e.NombreEmpresa
+                : !string.IsNullOrWhiteSpace(e.NombreCarpeta)
+                    ? e.NombreCarpeta
+                    : "(sin nombre)";
+
+            if (string.IsNullOrWhiteSpace(e.NombreCarpeta))
+                errores.Add($"Empresa '{nombre}': falta 'Nombre carpeta'.");
+
+            if (!string.IsNullOrWhiteSpace(e.CompanyCode))
+            {
+                if (!companyCodeMap.ContainsKey(e.CompanyCode))
+                    companyCodeMap[e.CompanyCode] = new List<string>();
+                companyCodeMap[e.CompanyCode].Add(nombre);
+            }
+
+            if (!string.IsNullOrWhiteSpace(e.ConcOp))
+            {
+                if (!concOpMap.ContainsKey(e.ConcOp))
+                    concOpMap[e.ConcOp] = new List<string>();
+                concOpMap[e.ConcOp].Add(nombre);
+            }
+
+            if (string.IsNullOrWhiteSpace(e.CompanyCode))
+                advertencias.Add($"Advertencia: '{nombre}' no tiene Company Code.");
+            if (string.IsNullOrWhiteSpace(e.ConcOp))
+                advertencias.Add($"Advertencia: '{nombre}' no tiene CONC_OP.");
+            if (string.IsNullOrWhiteSpace(e.Alias))
+                advertencias.Add($"Advertencia: '{nombre}' no tiene Alias.");
+        }
+
+        foreach (var kvp in companyCodeMap.Where(x => x.Value.Count > 1))
+        {
+            errores.Add($"Company Code '{kvp.Key}' está duplicado en: {string.Join(", ", kvp.Value)}.");
+        }
+
+        foreach (var kvp in concOpMap.Where(x => x.Value.Count > 1))
+        {
+            errores.Add($"CONC_OP '{kvp.Key}' está duplicado en: {string.Join(", ", kvp.Value)}.");
         }
 
         foreach (var c in config.Cuentas)
@@ -396,7 +444,7 @@
             if (string.IsNullOrWhiteSpace(c.ColumnaNota)) errores.Add("Cuenta: falta 'Columna nota'.");
         }
 
-        return errores;
+        return (errores, advertencias);
     }
 
 }

@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
+using Imbalances.Core.Services;
 
 namespace Imbalances.Core.Utils;
 
@@ -15,21 +16,26 @@ public static class TextNormalizer
 
         normalized = normalized.ToUpperInvariant();
 
-        normalized = normalized.Replace('.', ' ')
-                               .Replace('-', ' ')
-                               .Replace('_', ' ');
+        normalized = normalized.Replace(".", " ")
+                               .Replace("-", " ")
+                               .Replace("_", " ");
 
         normalized = Regex.Replace(normalized, @"\s+", " ").Trim();
 
         return normalized;
     }
 
-    private static string FoldLatinCharacters(string text)
+    public static string NormalizeForComparison(string? input)
+    {
+        return EmpresaDetectionService.NormalizeForComparison(input);
+    }
+
+    internal static string FoldLatinCharacters(string text)
     {
         var builder = new StringBuilder(text.Length);
         foreach (var ch in text)
         {
-            if (CharUnicodeInfo.GetUnicodeCategory(ch) == UnicodeCategory.NonSpacingMark)
+            if (CharUnicodeInfo.GetUnicodeCategory( ch) == UnicodeCategory.NonSpacingMark)
             {
                 continue;
             }

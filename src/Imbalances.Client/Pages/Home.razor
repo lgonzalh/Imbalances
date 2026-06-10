@@ -481,19 +481,19 @@
                 ExplorerState.ArchivosSeleccionados = savedState.ArchivosSeleccionados;
                 logsProcesamiento = savedState.Logs ?? new();
             }
-
-            if (!logsProcesamiento.Any())
-            {
-                var progreso = ProgressService.ObtenerEstado();
-                if (progreso.Logs.Any())
-                {
-                    logsProcesamiento = progreso.Logs.ToList();
-                }
-            }
         }
         else
         {
             Console.WriteLine($"[Explorador] Estado vivo en memoria - TreeItems: {ExplorerState.TreeItems.Count}, Resultados: {ExplorerState.Resultados.Count}");
+        }
+
+        if (!logsProcesamiento.Any())
+        {
+            var progreso = ProgressService.ObtenerEstado();
+            if (progreso.Logs.Any())
+            {
+                logsProcesamiento = progreso.Logs.ToList();
+            }
         }
     }
 
