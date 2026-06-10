@@ -1,14 +1,14 @@
-﻿## 1.7.3
-- Version: 1.7.3.0
+﻿## 1.7.4
+- Version: 1.7.4.0
 - Fecha: 2026-06-10
-- FASE 5.1A: Eliminacion Definitiva de Reprocesamiento. Cada Nota se procesa exactamente una vez por archivo, incluso si multiples cuentas la referencian. Resultados reutilizados entre cuentas.
-  - F5.1A.1: Procesamiento unico por nota. El bucle de procesamiento agrupa cuentas por nota y ejecuta ExtraerDesdeCacheMultiCuenta una sola vez. Antes: 1 llamada por cuenta. Despues: 1 llamada por nota.
-  - F5.1A.2: VecesProcesada=1 siempre. Ya no se incrementa por cuenta; se fija en 1 tras el procesamiento unico de la nota.
-  - F5.1A.3: Reporte Antes/Despues. Cada nota reporta "Procesamientos antes" (cuentas referenciadoras) vs "Procesamientos despues" (1 unico procesamiento). Propiedad ProcesamientosAntes en NoteStat.
-  - F5.1A.4: NotaUnicaPorArchivoTests (4 tests). Test obligatorio que falla si VecesProcesada > 1. Cubre: 2 cuentas, 4 cuentas, notas diferentes, reporte antes/despues.
-  - F5.1A.5: NoteReuseStats.NotasReutilizadas ahora basado en ProcesamientosAntes > 1 (antes: VecesProcesada > 1).
-  - F5.1A.6: TiempoAhorradoMs recalcula usando (ProcesamientosAntes - 1) * tiempo promedio, reflejando el ahorro real de procesamientos eliminados.
-  - F5.1A.7: 0 regresiones. 41/44 tests pasan (3 pre-existentes Blazor UI timeout). 13 tests nuevo codigo (9 reuse + 4 notaunica).
+- FASE 5.1B: Homologacion Deterministica y Reglas Especiales FSR. Deteccion de patrones FSR antes de logica fuzzy, eliminando descartes incorrectos de empresas validas.
+  - F5.1B.1: Nuevo metodo TienePatronFsr() en Motor1Extractor.cs detecta: "FSR" exacto, "(FSR)" incrustado, "FUNDACION SOLID RIVER" normalizado (con/sin acento).
+  - F5.1B.2: FSR override en clasificacion: si TienePatronFsr=true y no hay match normal, se asigna directamente FUNDACION SOLID RIVER como contraparte.
+  - F5.1B.3: FSRRegressionTests (14 tests): TienePatronFsr (8 casos), pipeline integracion (5 casos incluyendo patrones reales de assets/), alias resolution.
+  - F5.1B.4: PipelineAuditTests escenario 14: "Aporte de accionista por pagar (FSR)" genera movimiento FUNDACION SOLID RIVER.
+  - F5.1B.5: DosCorridasConsecutivas_ResultadosIdenticos: valida determinismo (mismos movimientos, homologaciones, valores en 2 ejecuciones).
+  - F5.1B.6: Auditoria real sobre 13 archivos assets/: 7 apariciones FSR detectadas, 4 descartes incorrectos resueltos (Aporte de accionista por pagar -(FSR), Inversion por pagar (FSR) x3).
+  - F5.1B.7: 0 regresiones. 56/59 tests pasan (3 pre-existentes Blazor UI timeout). 11 tests nuevos.
 - Build: 0 errores, 0 warnings
 
 ## 1.7.0

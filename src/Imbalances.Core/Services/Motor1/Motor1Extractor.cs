@@ -259,8 +259,7 @@ public class Motor1Extractor : IMotor1Extractor
 
                 string clasificacion;
                 string? contraparte = null;
-                var tieneFsr = nombre.Contains("(FSR)", StringComparison.OrdinalIgnoreCase) ||
-                               nombre.Trim().Equals("FSR", StringComparison.OrdinalIgnoreCase);
+                var tieneFsr = TienePatronFsr(nombre);
 
                 if (EsFilaEstructural(textoNormalizado))
                     clasificacion = "Estructural";
@@ -271,6 +270,10 @@ public class Motor1Extractor : IMotor1Extractor
                 else
                 {
                     contraparte = HomologarEmpresaIndex(textoNormalizado, homologIndex);
+
+                    if (string.IsNullOrEmpty(contraparte) && tieneFsr)
+                        contraparte = "FUNDACION SOLID RIVER";
+
                     clasificacion = string.IsNullOrEmpty(contraparte) ? "NoHomologada" : "Empresa";
                 }
 
@@ -885,6 +888,26 @@ public class Motor1Extractor : IMotor1Extractor
             baseText == e.NombreNormalizado ||
             baseText.StartsWith(e.NombreNormalizado + " ") ||
             e.NombreNormalizado.StartsWith(baseText + " "));
+    }
+
+    public static bool TienePatronFsr(string? nombre)
+    {
+        if (string.IsNullOrWhiteSpace(nombre))
+            return false;
+
+        var trimmed = nombre.Trim();
+
+        if (trimmed.Equals("FSR", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        if (nombre.Contains("(FSR)", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        var norm = Normalizar(nombre);
+        if (norm == "FUNDACION SOLID RIVER")
+            return true;
+
+        return false;
     }
 
     private static string HomologarEmpresaIndex(

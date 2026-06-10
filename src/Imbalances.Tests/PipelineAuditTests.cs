@@ -107,6 +107,13 @@ public class PipelineAuditTests
             new FakeWorkbook(new IExcelWorksheet[] { new FakeWorksheet("BALANCE DE SITUACION", 50000, new() { [5] = new FakeRow(new() { ["C"] = "Cuentas por cobrar clientes", ["J"] = "5" }) }), new FakeWorksheet("Nota 5", 50000, new() { [3] = new FakeRow(new() { ["C"] = "CUENTAS POR COBRAR" }), [4] = new FakeRow(new() { ["C"] = "COMPANIA A SA", ["I"] = "1,000.50" }), [5] = new FakeRow(new() { ["C"] = "COMPANIA A S A", ["I"] = "2,000.00" }) }) }),
             2 };
 
+        // 14. FSR EMBEDDED IN TEXT - "Aporte de accionista por pagar (FSR)" should map to FUNDACION SOLID RIVER
+        yield return new object[] { "14-FSR EMBEDDED",
+            "C:/data/ORIGEN/archivo.xlsx",
+            new ConfiguracionCore { Empresas = new() { new EmpresaConfig { NombreEmpresa = "EMPRESA ORIGEN", NombreCarpeta = "ORIGEN" }, new EmpresaConfig { NombreEmpresa = "FUNDACION SOLID RIVER" } }, Cuentas = new() { new CuentaConfig { NombreCuenta = "Cuentas por cobrar clientes", Tipo = "CxC" } }, AliasEmpresa = new() { new EquivalenciaTercero { Alias = "FSR", NombreEmpresaDestino = "FUNDACION SOLID RIVER" } } },
+            new FakeWorkbook(new IExcelWorksheet[] { new FakeWorksheet("BALANCE DE SITUACION", 50000, new() { [5] = new FakeRow(new() { ["C"] = "Cuentas por cobrar clientes", ["J"] = "5" }) }), new FakeWorksheet("Nota 5", 50000, new() { [3] = new FakeRow(new() { ["C"] = "CUENTAS POR COBRAR" }), [4] = new FakeRow(new() { ["C"] = "Aporte de accionista por pagar (FSR)", ["I"] = "1,000.50" }), [5] = new FakeRow(new() { ["C"] = "TOTAL", ["I"] = "1,000.50" }) }) }),
+            1 };
+
         // 13. INTEGRATION FULL - 2 cuentas, 2 notas, 5 empresas, FSR alias
         yield return new object[] { "13-INTEGRATION",
             "C:/data/ORIGEN/archivo.xlsx",
