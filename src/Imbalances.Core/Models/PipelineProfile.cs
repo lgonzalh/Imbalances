@@ -16,6 +16,7 @@ public class PipelineProfile
     public long TotalMs { get; set; }
     public int MovimientosGenerados { get; set; }
     public int NotasProcesadas { get; set; }
+    public NoteReuseStats ReuseStats { get; set; } = new();
 }
 
 public class PipelineProfileSummary
@@ -25,4 +26,9 @@ public class PipelineProfileSummary
     public long TotalTimeMs => Archivos.Sum(a => a.TotalMs);
     public int TotalMovimientos => Archivos.Sum(a => a.MovimientosGenerados);
     public double PromedioPorArchivoMs => Archivos.Count > 0 ? Archivos.Average(a => a.TotalMs) : 0;
+    public NoteReuseStats ReuseStats { get; set; } = new();
+    public int NotasUnicas => ReuseStats.NotasUnicas;
+    public int NotasReutilizadas => ReuseStats.NotasReutilizadas;
+    public double GananciaPorcentual => ReuseStats.GananciaPorcentual;
+    public long TiempoAhorradoMs => ReuseStats.TiempoAhorradoMs;
 }

@@ -100,7 +100,52 @@ public class ExtractorEngine : IExtractorEngine
             Archivos = perfiles.OrderBy(p => p.Archivo).ToList()
         };
 
+        // Aggregate NoteReuseStats across all files
+        var aggregatedReuse = new NoteReuseStats();
+        foreach (var perfil in perfiles)
+        {
+            foreach (var (nota, stat) in perfil.ReuseStats.Notas)
+            {
+                if (aggregatedReuse.Notas.TryGetValue(nota, out var existing))
+                {
+                    existing.VecesLeida += stat.VecesLeida;
+                    existing.VecesProcesada += stat.VecesProcesada;
+                    existing.VecesHomologada += stat.VecesHomologada;
+                    existing.TiempoLecturaMs += stat.TiempoLecturaMs;
+                    existing.TiempoProcesamientoMs += stat.TiempoProcesamientoMs;
+                    existing.ProcesamientosAntes += stat.ProcesamientosAntes;
+                }
+                else
+                {
+                    aggregatedReuse.Notas[nota] = new NoteStat
+                    {
+                        Nota = nota,
+                        VecesLeida = stat.VecesLeida,
+                        VecesProcesada = stat.VecesProcesada,
+                        VecesHomologada = stat.VecesHomologada,
+                        TiempoLecturaMs = stat.TiempoLecturaMs,
+                        TiempoProcesamientoMs = stat.TiempoProcesamientoMs,
+                        ProcesamientosAntes = stat.ProcesamientosAntes
+                    };
+                }
+            }
+        }
+
+        // Estimate time saved: each time a note had multiple cuentas (antes > 1),
+        // we avoided (antes - 1) full read+classify passes
+        foreach (var stat in aggregatedReuse.Notas.Values)
+        {
+            if (stat.ProcesamientosAntes > 1)
+            {
+                var savedReads = stat.ProcesamientosAntes - 1;
+                var avgTimePerProcess = stat.TiempoProcesamientoMs / Math.Max(1, stat.VecesProcesada);
+                aggregatedReuse.TiempoAhorradoMs += savedReads * (stat.TiempoLecturaMs + avgTimePerProcess);
+            }
+        }
+        summary.ReuseStats = aggregatedReuse;
+
         onProgressLog?.Invoke($"[Perfil] Total {archivos.Count} archivos: {swTotal.ElapsedMilliseconds}ms (paralelismo={maxParallelism})");
+        onProgressLog?.Invoke($"[Reuse] Notas unicas={aggregatedReuse.NotasUnicas}, reutilizadas={aggregatedReuse.NotasReutilizadas}, tiempo ahorrado={aggregatedReuse.TiempoAhorradoMs}ms, ganancia={aggregatedReuse.GananciaPorcentual}%");
 
         return (resultados.ToList(), summary);
     }
